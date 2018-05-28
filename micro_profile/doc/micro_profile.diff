@@ -1,0 +1,3209 @@
+diff --git a/.gitignore b/.gitignore
+index 3bb753c..1763f31 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -39,3 +39,7 @@ docs/doxygen
+ # Tests
+ tests/test262/
+ .vs
++
++# micro profile
++micro_profile/micro.snapshot
++micro_profile/include/micro-source.h
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 0fea9d8..80283af 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -238,7 +238,7 @@ if(JERRY_PORT_DEFAULT)
+ endif()
+ 
+ # Jerry command line tool
+-if(JERRY_CMDLINE OR JERRY_CMDLINE_TEST OR JERRY_CMDLINE_SNAPSHOT)
++if(JERRY_CMDLINE OR JERRY_CMDLINE_TEST OR JERRY_CMDLINE_SNAPSHOT OR JERRY_CMDLINE_MICRO)
+   add_subdirectory(jerry-main)
+ endif()
+ 
+diff --git a/jerry-core/CMakeLists.txt b/jerry-core/CMakeLists.txt
+index fdec1c2..02a80d4 100644
+--- a/jerry-core/CMakeLists.txt
++++ b/jerry-core/CMakeLists.txt
+@@ -193,6 +193,11 @@ if(NOT FEATURE_JS_PARSER)
+   set(DEFINES_JERRY ${DEFINES_JERRY} JERRY_DISABLE_JS_PARSER)
+ endif()
+ 
++if(CONFIG_REDUCE_FLOAT_STRINGIFY)
++  set(DEFINES_JERRY ${DEFINES_JERRY} CONFIG_REDUCE_FLOAT_STRINGIFY)
++  set(DEFINES_JERRY ${DEFINES_JERRY} CONFIG_DISABLE_DATE_BUILTIN)
++endif()
++
+ # JS line info
+ if(FEATURE_LINE_INFO)
+   set(DEFINES_JERRY ${DEFINES_JERRY} JERRY_ENABLE_LINE_INFO)
+diff --git a/jerry-core/api/jerry.c b/jerry-core/api/jerry.c
+index 5de2731..f38a56b 100644
+--- a/jerry-core/api/jerry.c
++++ b/jerry-core/api/jerry.c
+@@ -270,6 +270,7 @@ jerry_register_magic_strings (const jerry_char_t * const *ex_str_items_p, /**< c
+                             (const lit_utf8_size_t *) str_lengths_p);
+ } /* jerry_register_magic_strings */
+ 
++#ifndef CONFIG_MICRO_PROFILE
+ /**
+  * Run garbage collection
+  */
+@@ -576,6 +577,8 @@ jerry_run_all_enqueued_jobs (void)
+ #endif /* CONFIG_DISABLE_ES2015_PROMISE_BUILTIN */
+ } /* jerry_run_all_enqueued_jobs */
+ 
++#endif /* CONFIG_MICRO_PROFILE */
++
+ /**
+  * Get global object
+  *
+@@ -726,6 +729,7 @@ jerry_value_is_object (const jerry_value_t value) /**< api value */
+   return ecma_is_value_object (value);
+ } /* jerry_value_is_object */
+ 
++#ifndef CONFIG_MICRO_PROFILE
+ /**
+  * Check if the specified value is promise.
+  *
+@@ -744,6 +748,7 @@ jerry_value_is_promise (const jerry_value_t value) /**< api value */
+   return false;
+ #endif /* !CONFIG_DISABLE_ES2015_PROMISE_BUILTIN */
+ } /* jerry_value_is_promise */
++#endif /* !CONFIG_MICRO_PROFILE */
+ 
+ /**
+  * Check if the specified value is string.
+@@ -773,6 +778,7 @@ jerry_value_is_undefined (const jerry_value_t value) /**< api value */
+   return ecma_is_value_undefined (value);
+ } /* jerry_value_is_undefined */
+ 
++#ifndef CONFIG_MICRO_PROFILE
+ /**
+  * Perform the base type of the JavaScript value.
+  *
+@@ -892,6 +898,7 @@ jerry_is_feature_enabled (const jerry_feature_t feature) /**< feature to check *
+           );
+ } /* jerry_is_feature_enabled */
+ 
++#endif /* !CONFIG_MICRO_PROFILE */
+ /**
+  * Create abort from an api value.
+  *
+@@ -1396,6 +1403,7 @@ jerry_create_object (void)
+   return ecma_make_object_value (ecma_op_create_object_object_noarg ());
+ } /* jerry_create_object */
+ 
++#ifndef CONFIG_MICRO_PROFILE
+ /**
+  * Create an empty Promise object which can be resolve/reject later
+  * by calling jerry_resolve_or_reject_promise.
+@@ -1416,7 +1424,9 @@ jerry_create_promise (void)
+   return jerry_throw (ecma_raise_type_error (ECMA_ERR_MSG ("Promise not supported.")));
+ #endif /* CONFIG_DISABLE_ES2015_PROMISE_BUILTIN */
+ } /* jerry_create_promise */
++#endif /* !CONFIG_MICRO_PROFILE */
+ 
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+ /**
+  * Create string from a valid UTF-8 string
+  *
+@@ -1465,6 +1475,7 @@ jerry_create_string (const jerry_char_t *str_p) /**< pointer to string */
+   return jerry_create_string_sz (str_p, lit_zt_utf8_string_size ((lit_utf8_byte_t *) str_p));
+ } /* jerry_create_string */
+ 
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ /**
+  * Create string from a valid CESU-8 string
+  *
+@@ -1532,6 +1543,7 @@ jerry_get_string_size (const jerry_value_t value) /**< input string */
+   return ecma_string_get_size (ecma_get_string_from_value (value));
+ } /* jerry_get_string_size */
+ 
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+ /**
+  * Get UTF-8 encoded string size from Jerry string
+  *
+@@ -1552,6 +1564,7 @@ jerry_get_utf8_string_size (const jerry_value_t value) /**< input string */
+ 
+   return ecma_string_get_utf8_size (ecma_get_string_from_value (value));
+ } /* jerry_get_utf8_string_size */
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ 
+ /**
+  * Get length of Jerry string
+@@ -1574,6 +1587,7 @@ jerry_get_string_length (const jerry_value_t value) /**< input string */
+   return ecma_string_get_length (ecma_get_string_from_value (value));
+ } /* jerry_get_string_length */
+ 
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+ /**
+  * Get UTF-8 string length from Jerry string
+  *
+@@ -1594,6 +1608,7 @@ jerry_get_utf8_string_length (const jerry_value_t value) /**< input string */
+ 
+   return ecma_string_get_utf8_length (ecma_get_string_from_value (value));
+ } /* jerry_get_utf8_string_length */
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ 
+ /**
+  * Copy the characters of a string into a specified buffer.
+@@ -1634,6 +1649,7 @@ jerry_string_to_char_buffer (const jerry_value_t value, /**< input string value
+                                            buffer_size);
+ } /* jerry_string_to_char_buffer */
+ 
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+ /**
+  * Copy the characters of an utf-8 encoded string into a specified buffer.
+  *
+@@ -1672,6 +1688,7 @@ jerry_string_to_utf8_char_buffer (const jerry_value_t value, /**< input string v
+                                           (lit_utf8_byte_t *) buffer_p,
+                                           buffer_size);
+ } /* jerry_string_to_utf8_char_buffer */
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ 
+ /**
+  * Copy the characters of an cesu-8 encoded substring into a specified buffer.
+@@ -1707,6 +1724,7 @@ jerry_substring_to_char_buffer (const jerry_value_t value, /**< input string val
+                                               buffer_size);
+ } /* jerry_substring_to_char_buffer */
+ 
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+ /**
+  * Copy the characters of an utf-8 encoded substring into a specified buffer.
+  *
+@@ -1740,6 +1758,7 @@ jerry_substring_to_utf8_char_buffer (const jerry_value_t value, /**< input strin
+                                              (lit_utf8_byte_t *) buffer_p,
+                                              buffer_size);
+ } /* jerry_substring_to_utf8_char_buffer */
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ 
+ /**
+  * Checks whether the object or it's prototype objects have the given property.
+@@ -2555,6 +2574,7 @@ jerry_foreach_object_property (const jerry_value_t obj_val, /**< object value */
+   return false;
+ } /* jerry_foreach_object_property */
+ 
++#ifndef CONFIG_MICRO_PROFILE
+ /**
+  * Resolve or reject the promise with an argument.
+  *
+@@ -2595,7 +2615,9 @@ jerry_resolve_or_reject_promise (jerry_value_t promise, /**< the promise value *
+   return jerry_throw (ecma_raise_type_error (ECMA_ERR_MSG ("Promise not supported.")));
+ #endif /* !CONFIG_DISABLE_ES2015_PROMISE_BUILTIN */
+ } /* jerry_resolve_or_reject_promise */
++#endif /* !CONFIG_MICRO_PROFILE */
+ 
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+ /**
+  * Validate UTF-8 string
+  *
+@@ -2623,6 +2645,7 @@ jerry_is_valid_cesu8_string (const jerry_char_t *cesu8_buf_p, /**< CESU-8 string
+   return lit_is_valid_cesu8_string ((lit_utf8_byte_t *) cesu8_buf_p,
+                                     (lit_utf8_size_t) buf_size);
+ } /* jerry_is_valid_cesu8_string */
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ 
+ /**
+  * Allocate memory on the engine's heap.
+@@ -2720,6 +2743,7 @@ jerry_create_context (uint32_t heap_size, /**< the size of heap */
+ #endif /* JERRY_ENABLE_EXTERNAL_CONTEXT */
+ } /* jerry_create_context */
+ 
++#ifndef CONFIG_MICRO_PROFILE
+ /**
+  * If JERRY_VM_EXEC_STOP is defined the callback passed to this function is
+  * periodically called with the user_p argument. If frequency is greater
+@@ -3371,6 +3395,7 @@ jerry_json_stringfy (const jerry_value_t object_to_stringify) /**< a jerry_objec
+ #endif /* !CONFIG_DISABLE_JSON_BUILTIN */
+ } /* jerry_json_stringfy */
+ 
++#endif /* !CONFIG_MICRO_PROFILE */
+ /**
+  * @}
+  */
+diff --git a/jerry-core/config.h b/jerry-core/config.h
+index f74a31e..99e989d 100644
+--- a/jerry-core/config.h
++++ b/jerry-core/config.h
+@@ -71,7 +71,11 @@
+ #define CONFIG_ECMA_NUMBER_FLOAT64 (2u) /* 64-bit float */
+ 
+ #ifndef CONFIG_ECMA_NUMBER_TYPE
++#ifdef CONFIG_REDUCE_FLOAT_STRINGIFY
++# define CONFIG_ECMA_NUMBER_TYPE CONFIG_ECMA_NUMBER_FLOAT32
++#else /* !CONFIG_REDUCE_FLOAT_STRINGIFY */
+ # define CONFIG_ECMA_NUMBER_TYPE CONFIG_ECMA_NUMBER_FLOAT64
++#endif /* CONFIG_REDUCE_FLOAT_STRINGIFY */
+ #else /* CONFIG_ECMA_NUMBER_TYPE */
+ # if (CONFIG_ECMA_NUMBER_TYPE != CONFIG_ECMA_NUMBER_FLOAT32 \
+       && CONFIG_ECMA_NUMBER_TYPE != CONFIG_ECMA_NUMBER_FLOAT64)
+diff --git a/jerry-core/ecma/base/ecma-helpers-conversion.c b/jerry-core/ecma/base/ecma-helpers-conversion.c
+index 58bf763..2a6c6e8 100644
+--- a/jerry-core/ecma/base/ecma-helpers-conversion.c
++++ b/jerry-core/ecma/base/ecma-helpers-conversion.c
+@@ -818,6 +818,11 @@ ecma_number_to_int32 (ecma_number_t num) /**< ecma-number */
+   return ret;
+ } /* ecma_number_to_int32 */
+ 
++#ifdef CONFIG_REDUCE_FLOAT_STRINGIFY
++static lit_utf8_size_t
++ecma_double_to_binary_floating_point (double val, lit_utf8_byte_t *buffer_p, int32_t *exp_p);
++#endif /* !CONFIG_REDUCE_FLOAT_STRINGIFY */
++
+ /**
+   * Perform conversion of ecma-number to decimal representation with decimal exponent.
+   *
+@@ -839,7 +844,11 @@ ecma_number_to_decimal (ecma_number_t num, /**< ecma-number */
+   JERRY_ASSERT (!ecma_number_is_infinity (num));
+   JERRY_ASSERT (!ecma_number_is_negative (num));
+ 
++#ifndef CONFIG_REDUCE_FLOAT_STRINGIFY
+   return ecma_errol0_dtoa ((double) num, out_digits_p, out_decimal_exp_p);
++#else
++  return ecma_double_to_binary_floating_point (num, out_digits_p, out_decimal_exp_p);
++#endif /* !CONFIG_REDUCE_FLOAT_STRINGIFY */
+ } /* ecma_number_to_decimal */
+ 
+ /**
+@@ -974,8 +983,13 @@ ecma_number_to_binary_floating_point_number (ecma_number_t num, /**< ecma-number
+   JERRY_ASSERT (!ecma_number_is_zero (num));
+   JERRY_ASSERT (!ecma_number_is_infinity (num));
+   JERRY_ASSERT (!ecma_number_is_negative (num));
+-
++#ifndef CONFIG_REDUCE_FLOAT_STRINGIFY
+   return ecma_double_to_binary_floating_point ((double) num, out_digits_p, out_decimal_exp_p);
++#else
++  JERRY_UNUSED (out_digits_p);
++  JERRY_UNUSED (out_decimal_exp_p);
++  return 0;
++#endif /* !CONFIG_REDUCE_FLOAT_STRINGIFY */
+ } /* ecma_number_to_binary_floating_point_number */
+ 
+ /**
+@@ -1050,7 +1064,6 @@ ecma_number_to_utf8_string (ecma_number_t num, /**< ecma-number */
+   {
+     /* 6. */
+     dst_p += k;
+-
+     memset (dst_p, LIT_CHAR_0, (size_t) (n - k));
+     dst_p += n - k;
+ 
+@@ -1073,7 +1086,10 @@ ecma_number_to_utf8_string (ecma_number_t num, /**< ecma-number */
+   {
+     /* 8. */
+     memmove (dst_p + 2 - n, dst_p, (size_t) k);
+-    memset (dst_p + 2, LIT_CHAR_0, (size_t) -n);
++    if (n != 0)
++    {
++      memset (dst_p + 2, LIT_CHAR_0, (size_t) -n);
++    }
+     *dst_p = LIT_CHAR_0;
+     *(dst_p + 1) = LIT_CHAR_DOT;
+     dst_p += k - n + 2;
+diff --git a/jerry-core/ecma/base/ecma-helpers-errol.c b/jerry-core/ecma/base/ecma-helpers-errol.c
+index c73e1e4..8dd7f6b 100644
+--- a/jerry-core/ecma/base/ecma-helpers-errol.c
++++ b/jerry-core/ecma/base/ecma-helpers-errol.c
+@@ -36,6 +36,7 @@
+  *   SOFTWARE.
+  */
+ 
++
+ #include <math.h>
+ 
+ #include "ecma-helpers.h"
+@@ -53,6 +54,7 @@
+  * available at http://cseweb.ucsd.edu/~mandrysc/pub/dtoa.pdf
+  */
+ 
++#ifndef CONFIG_REDUCE_FLOAT_STRINGIFY
+ /**
+  * Floating point format definitions (next float value)
+  */
+@@ -235,6 +237,8 @@ ecma_errol0_dtoa (double val, /**< ecma number */
+   return (lit_utf8_size_t) (dst_p - buffer_p);
+ } /* ecma_errol0_dtoa */
+ 
++#endif /* !CONFIG_REDUCE_FLOAT_STRINGIFY */
++
+ /**
+  * @}
+  * @}
+diff --git a/jerry-core/ecma/base/ecma-helpers-string.c b/jerry-core/ecma/base/ecma-helpers-string.c
+index 41a1112..da51618 100644
+--- a/jerry-core/ecma/base/ecma-helpers-string.c
++++ b/jerry-core/ecma/base/ecma-helpers-string.c
+@@ -131,6 +131,10 @@ static const lit_utf8_byte_t *
+ ecma_string_get_chars_fast (const ecma_string_t *string_p, /**< ecma-string */
+                             lit_utf8_size_t *size_p) /**< [out] size of the ecma string */
+ {
++#ifdef CONFIG_MICRO_PROFILE
++  uint8_t flags = ECMA_STRING_FLAG_IS_ASCII;
++  return ecma_string_get_chars (string_p, size_p, &flags);
++#else
+   if (ECMA_IS_DIRECT_STRING (string_p))
+   {
+     if (ECMA_GET_DIRECT_STRING_TYPE (string_p) == ECMA_DIRECT_STRING_MAGIC)
+@@ -172,6 +176,7 @@ ecma_string_get_chars_fast (const ecma_string_t *string_p, /**< ecma-string */
+       return lit_get_magic_string_ex_utf8 (string_p->u.magic_string_ex_id);
+     }
+   }
++#endif /* CONFIG_MICRO_PROFILE */
+ } /* ecma_string_get_chars_fast */
+ 
+ /**
+@@ -255,6 +260,7 @@ ecma_new_ecma_string_from_utf8 (const lit_utf8_byte_t *string_p, /**< utf-8 stri
+   }
+   else
+   {
++#ifndef OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING
+     string_desc_p = ecma_alloc_string_buffer (sizeof (ecma_long_string_t) + string_size);
+ 
+     string_desc_p->refs_and_container = ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING | ECMA_STRING_REF_ONE;
+@@ -265,6 +271,9 @@ ecma_new_ecma_string_from_utf8 (const lit_utf8_byte_t *string_p, /**< utf-8 stri
+     long_string_desc_p->long_utf8_string_length = lit_utf8_string_length (string_p, string_size);
+ 
+     data_p = (lit_utf8_byte_t *) (long_string_desc_p + 1);
++#else
++      jerry_fatal (ERR_OUT_OF_MEMORY);
++#endif
+   }
+ 
+   string_desc_p->hash = lit_utf8_string_calc_hash (string_p, string_size);
+@@ -291,6 +300,7 @@ ecma_new_ecma_string_from_utf8_converted_to_cesu8 (const lit_utf8_byte_t *string
+   lit_utf8_size_t pos = 0;
+ 
+   /* Calculate the required length and size information of the converted cesu-8 encoded string */
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   while (pos < string_size)
+   {
+     if ((string_p[pos] & LIT_UTF8_1_BYTE_MASK) == LIT_UTF8_1_BYTE_MARKER)
+@@ -315,6 +325,9 @@ ecma_new_ecma_string_from_utf8_converted_to_cesu8 (const lit_utf8_byte_t *string
+ 
+     converted_string_length++;
+   }
++#else
++  pos = converted_string_size = converted_string_length = string_size;
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ 
+   JERRY_ASSERT (pos == string_size);
+ 
+@@ -343,8 +356,8 @@ ecma_new_ecma_string_from_utf8_converted_to_cesu8 (const lit_utf8_byte_t *string
+     }
+     else
+     {
++#ifndef OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING
+       string_desc_p = ecma_alloc_string_buffer (sizeof (ecma_long_string_t) + converted_string_size);
+-
+       string_desc_p->refs_and_container = ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING | ECMA_STRING_REF_ONE;
+       string_desc_p->u.common_uint32_field = 0;
+       string_desc_p->u.long_utf8_string_size = converted_string_size;
+@@ -353,6 +366,9 @@ ecma_new_ecma_string_from_utf8_converted_to_cesu8 (const lit_utf8_byte_t *string
+       long_string_desc_p->long_utf8_string_length = converted_string_length;
+ 
+       data_p = (lit_utf8_byte_t *) (long_string_desc_p + 1);
++#else
++      jerry_fatal (ERR_OUT_OF_MEMORY);
++#endif
+     }
+ 
+     const lit_utf8_byte_t *const begin_data_p = data_p;
+@@ -360,6 +376,7 @@ ecma_new_ecma_string_from_utf8_converted_to_cesu8 (const lit_utf8_byte_t *string
+ 
+     while (pos < string_size)
+     {
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+       if ((string_p[pos] & LIT_UTF8_4_BYTE_MASK) == LIT_UTF8_4_BYTE_MARKER)
+       {
+         /* Processing 4 byte unicode sequence. Always converted to two 3 byte long sequence. */
+@@ -378,6 +395,9 @@ ecma_new_ecma_string_from_utf8_converted_to_cesu8 (const lit_utf8_byte_t *string
+       {
+         *data_p++ = string_p[pos++];
+       }
++#else /* CONFIG_DISABLE_UTF8_CHARACTERS */
++      *data_p++ = string_p[pos++];
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+     }
+ 
+     JERRY_ASSERT (pos == string_size);
+@@ -466,6 +486,7 @@ ecma_new_ecma_string_from_number (ecma_number_t num) /**< ecma-number */
+     return ecma_get_magic_string (id);
+   }
+ 
++#ifndef CONFIG_MICRO_PROFILE
+   lit_utf8_byte_t str_buf[ECMA_MAX_CHARS_IN_STRINGIFIED_NUMBER];
+   lit_utf8_size_t str_size = ecma_number_to_utf8_string (num, str_buf, sizeof (str_buf));
+ 
+@@ -486,6 +507,9 @@ ecma_new_ecma_string_from_number (ecma_number_t num) /**< ecma-number */
+   lit_utf8_byte_t *data_p = (lit_utf8_byte_t *) (string_desc_p + 1);
+   memcpy (data_p, str_buf, str_size);
+   return string_desc_p;
++#else
++  return ecma_new_ecma_string_from_uint32 ((uint32_t) num);
++#endif /* !CONFIG_MICRO_PROFILE */
+ } /* ecma_new_ecma_string_from_number */
+ 
+ /**
+@@ -585,13 +609,18 @@ ecma_append_chars_to_string (ecma_string_t *string1_p, /**< base ecma-string */
+       }
+       case ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING:
+       {
++#ifndef OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING
+         ecma_long_string_t *long_string_desc_p = (ecma_long_string_t *) string1_p;
+ 
+         cesu8_string1_p = (lit_utf8_byte_t *) (long_string_desc_p + 1);
+         cesu8_string1_size = string1_p->u.long_utf8_string_size;
+         cesu8_string1_length = long_string_desc_p->long_utf8_string_length;
+         break;
++#else
++      jerry_fatal (ERR_OUT_OF_MEMORY);
++#endif
+       }
++
+       case ECMA_STRING_CONTAINER_UINT32_IN_DESC:
+       {
+         cesu8_string1_size = ecma_uint32_to_utf8_string (string1_p->u.uint32_number,
+@@ -685,6 +714,7 @@ ecma_append_chars_to_string (ecma_string_t *string1_p, /**< base ecma-string */
+   }
+   else
+   {
++#ifndef OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING
+     string_desc_p = ecma_alloc_string_buffer (sizeof (ecma_long_string_t) + new_size);
+ 
+     string_desc_p->refs_and_container = ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING | ECMA_STRING_REF_ONE;
+@@ -695,6 +725,9 @@ ecma_append_chars_to_string (ecma_string_t *string1_p, /**< base ecma-string */
+     long_string_desc_p->long_utf8_string_length = cesu8_string1_length + cesu8_string2_length;
+ 
+     data_p = (lit_utf8_byte_t *) (long_string_desc_p + 1);
++#else
++    jerry_fatal (ERR_OUT_OF_MEMORY);
++#endif
+   }
+ 
+   lit_string_hash_t hash_start;
+@@ -797,12 +830,16 @@ ecma_concat_ecma_strings (ecma_string_t *string1_p, /**< first ecma-string */
+       }
+       case ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING:
+       {
++#ifndef OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING
+         ecma_long_string_t *long_string_desc_p = (ecma_long_string_t *) string2_p;
+ 
+         cesu8_string2_p = (lit_utf8_byte_t *) (long_string_desc_p + 1);
+         cesu8_string2_size = string2_p->u.long_utf8_string_size;
+         cesu8_string2_length = long_string_desc_p->long_utf8_string_length;
+         break;
++#else
++      jerry_fatal (ERR_OUT_OF_MEMORY);
++#endif
+       }
+       case ECMA_STRING_CONTAINER_UINT32_IN_DESC:
+       {
+@@ -924,10 +961,14 @@ ecma_deref_ecma_string (ecma_string_t *string_p) /**< ecma-string */
+     }
+     case ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING:
+     {
++#ifndef OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING
+       JERRY_ASSERT (string_p->u.long_utf8_string_size > UINT16_MAX);
+ 
+       ecma_dealloc_string_buffer (string_p, string_p->u.long_utf8_string_size + sizeof (ecma_long_string_t));
+       return;
++#else
++      jerry_fatal (ERR_OUT_OF_MEMORY);
++#endif
+     }
+     case ECMA_STRING_LITERAL_NUMBER:
+     {
+@@ -1257,6 +1298,7 @@ ecma_substring_copy_to_utf8_buffer (const ecma_string_t *string_desc_p, /**< ecm
+ 
+     memcpy (buffer_p, cesu8_str_p, size);
+   }
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   else
+   {
+     const lit_utf8_byte_t *cesu8_end_pos = cesu8_str_p + cesu8_str_size;
+@@ -1333,6 +1375,7 @@ ecma_substring_copy_to_utf8_buffer (const ecma_string_t *string_desc_p, /**< ecm
+ 
+     JERRY_ASSERT (utf8_pos <= utf8_end_pos);
+   }
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ 
+   ECMA_FINALIZE_UTF8_STRING (cesu8_str_p, cesu8_str_size);
+   JERRY_ASSERT (size <= buffer_size);
+@@ -1474,11 +1517,15 @@ ecma_string_get_chars (const ecma_string_t *string_p, /**< ecma-string */
+       }
+       case ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING:
+       {
++#ifndef OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING
+         size = string_p->u.long_utf8_string_size;
+         ecma_long_string_t *long_string_p = (ecma_long_string_t *) string_p;
+         length = long_string_p->long_utf8_string_length;
+         result_p = (const lit_utf8_byte_t *) (long_string_p + 1);
+         break;
++#else
++      jerry_fatal (ERR_OUT_OF_MEMORY);
++#endif
+       }
+       case ECMA_STRING_CONTAINER_UINT32_IN_DESC:
+       {
+@@ -1712,6 +1759,8 @@ ecma_compare_ecma_strings_longpath (const ecma_string_t *string1_p, /**< ecma-st
+   const lit_utf8_byte_t *utf8_string1_p, *utf8_string2_p;
+   lit_utf8_size_t utf8_string1_size, utf8_string2_size;
+ 
++
++#ifndef OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING
+   if (ECMA_STRING_GET_CONTAINER (string1_p) == ECMA_STRING_CONTAINER_HEAP_UTF8_STRING)
+   {
+     utf8_string1_p = (lit_utf8_byte_t *) (string1_p + 1);
+@@ -1728,6 +1777,12 @@ ecma_compare_ecma_strings_longpath (const ecma_string_t *string1_p, /**< ecma-st
+     utf8_string2_p = (lit_utf8_byte_t *) (((ecma_long_string_t *) string2_p) + 1);
+     utf8_string2_size = string2_p->u.long_utf8_string_size;
+   }
++#else
++  utf8_string1_p = (lit_utf8_byte_t *) (string1_p + 1);
++  utf8_string1_size = string1_p->u.utf8_string.size;
++  utf8_string2_p = (lit_utf8_byte_t *) (string2_p + 1);
++  utf8_string2_size = string2_p->u.utf8_string.size;
++#endif /* !OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING */
+ 
+   if (utf8_string1_size != utf8_string2_size)
+   {
+@@ -1996,7 +2051,11 @@ ecma_string_get_length (const ecma_string_t *string_p) /**< ecma-string */
+     }
+     case ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING:
+     {
++#ifndef OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING
+       return (ecma_length_t) (((ecma_long_string_t *) string_p)->long_utf8_string_length);
++#else /* OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING */
++      jerry_fatal (ERR_OUT_OF_MEMORY);
++#endif /* !OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING */
+     }
+     default:
+     {
+@@ -2016,6 +2075,9 @@ ecma_string_get_length (const ecma_string_t *string_p) /**< ecma-string */
+ ecma_length_t
+ ecma_string_get_utf8_length (const ecma_string_t *string_p) /**< ecma-string */
+ {
++#ifdef CONFIG_DISABLE_UTF8_CHARACTERS
++  return ecma_string_get_utf8_size (string_p);
++#else /* CONFIG_DISABLE_UTF8_CHARACTERS */
+   ecma_length_t length = ecma_string_get_ascii_size (string_p);
+ 
+   if (length != ECMA_STRING_NO_ASCII_SIZE)
+@@ -2046,6 +2108,7 @@ ecma_string_get_utf8_length (const ecma_string_t *string_p) /**< ecma-string */
+     }
+     case ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING:
+     {
++#ifndef OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING
+       ecma_long_string_t *long_string_p = (ecma_long_string_t *) string_p;
+       if (string_p->u.long_utf8_string_size == (lit_utf8_size_t) long_string_p->long_utf8_string_length)
+       {
+@@ -2054,6 +2117,9 @@ ecma_string_get_utf8_length (const ecma_string_t *string_p) /**< ecma-string */
+ 
+       return lit_get_utf8_length_of_cesu8_string ((const lit_utf8_byte_t *) (long_string_p + 1),
+                                                   (lit_utf8_size_t) string_p->u.long_utf8_string_size);
++#else /* OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING */
++      jerry_fatal (ERR_OUT_OF_MEMORY);
++#endif /* !OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING */
+     }
+     default:
+     {
+@@ -2063,6 +2129,7 @@ ecma_string_get_utf8_length (const ecma_string_t *string_p) /**< ecma-string */
+                                                   lit_get_magic_string_ex_size (string_p->u.magic_string_ex_id));
+     }
+   }
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* ecma_string_get_utf8_length */
+ 
+ /**
+@@ -2073,6 +2140,9 @@ ecma_string_get_utf8_length (const ecma_string_t *string_p) /**< ecma-string */
+ lit_utf8_size_t
+ ecma_string_get_size (const ecma_string_t *string_p) /**< ecma-string */
+ {
++#ifdef CONFIG_MICRO_PROFILE
++  return ecma_string_get_ascii_size (string_p);
++#else
+   ecma_length_t length = ecma_string_get_ascii_size (string_p);
+ 
+   if (length != ECMA_STRING_NO_ASCII_SIZE)
+@@ -2094,10 +2164,12 @@ ecma_string_get_size (const ecma_string_t *string_p) /**< ecma-string */
+     {
+       return (lit_utf8_size_t) string_p->u.utf8_string.size;
+     }
++#ifndef OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING
+     case ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING:
+     {
+       return (lit_utf8_size_t) string_p->u.long_utf8_string_size;
+     }
++#endif
+     default:
+     {
+       JERRY_ASSERT (ECMA_STRING_GET_CONTAINER (string_p) == ECMA_STRING_CONTAINER_MAGIC_STRING_EX);
+@@ -2105,6 +2177,7 @@ ecma_string_get_size (const ecma_string_t *string_p) /**< ecma-string */
+       return lit_get_magic_string_ex_size (string_p->u.magic_string_ex_id);
+     }
+   }
++#endif /* CONFIG_MICRO_PROFILE */
+ } /* ecma_string_get_size */
+ 
+ /**
+@@ -2145,6 +2218,7 @@ ecma_string_get_utf8_size (const ecma_string_t *string_p) /**< ecma-string */
+     }
+     case ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING:
+     {
++#ifndef OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING
+       ecma_long_string_t *long_string_p = (ecma_long_string_t *) string_p;
+       if (string_p->u.long_utf8_string_size == (lit_utf8_size_t) long_string_p->long_utf8_string_length)
+       {
+@@ -2153,6 +2227,9 @@ ecma_string_get_utf8_size (const ecma_string_t *string_p) /**< ecma-string */
+ 
+       return lit_get_utf8_size_of_cesu8_string ((const lit_utf8_byte_t *) (string_p + 1),
+                                                 (lit_utf8_size_t) string_p->u.long_utf8_string_size);
++#else /* OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING */
++      jerry_fatal (ERR_OUT_OF_MEMORY);
++#endif /* !OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING */
+     }
+     default:
+     {
+diff --git a/jerry-core/ecma/base/ecma-helpers.h b/jerry-core/ecma/base/ecma-helpers.h
+index 78107ab..9aa6c5f 100644
+--- a/jerry-core/ecma/base/ecma-helpers.h
++++ b/jerry-core/ecma/base/ecma-helpers.h
+@@ -367,11 +367,13 @@ ecma_number_t ecma_utf8_string_to_number (const lit_utf8_byte_t *str_p, lit_utf8
+ lit_utf8_size_t ecma_uint32_to_utf8_string (uint32_t value, lit_utf8_byte_t *out_buffer_p, lit_utf8_size_t buffer_size);
+ uint32_t ecma_number_to_uint32 (ecma_number_t num);
+ int32_t ecma_number_to_int32 (ecma_number_t num);
++
+ lit_utf8_size_t ecma_number_to_utf8_string (ecma_number_t num, lit_utf8_byte_t *buffer_p, lit_utf8_size_t buffer_size);
+ 
++#ifndef CONFIG_REDUCE_FLOAT_STRINGIFY
+ /* ecma-helpers-errol.c */
+ lit_utf8_size_t ecma_errol0_dtoa (double val, lit_utf8_byte_t *buffer_p, int32_t *exp_p);
+-
++#endif /* !CONFIG_REDUCE_FLOAT_STRINGIFY */
+ /**
+  * @}
+  * @}
+diff --git a/jerry-core/ecma/builtin-objects/ecma-builtin-function-prototype.c b/jerry-core/ecma/builtin-objects/ecma-builtin-function-prototype.c
+index 32b8cb3..ba6b340 100644
+--- a/jerry-core/ecma/builtin-objects/ecma-builtin-function-prototype.c
++++ b/jerry-core/ecma/builtin-objects/ecma-builtin-function-prototype.c
+@@ -48,6 +48,7 @@
+  */
+ #define ECMA_FUNCTION_APPLY_ARGUMENT_COUNT_LIMIT 65535
+ 
++#ifndef CONFIG_MICRO_PROFILE
+ /**
+  * The Function.prototype object's 'toString' routine
+  *
+@@ -318,6 +319,7 @@ ecma_builtin_function_prototype_object_bind (ecma_value_t this_arg, /**< this ar
+   return ret_value;
+ } /* ecma_builtin_function_prototype_object_bind */
+ 
++#endif /* !CONFIG_MICRO_PROFILE */
+ /**
+  * Handle calling [[Call]] of built-in Function.prototype object
+  *
+diff --git a/jerry-core/ecma/builtin-objects/ecma-builtin-function-prototype.inc.h b/jerry-core/ecma/builtin-objects/ecma-builtin-function-prototype.inc.h
+index 9d38567..3e7908b 100644
+--- a/jerry-core/ecma/builtin-objects/ecma-builtin-function-prototype.inc.h
++++ b/jerry-core/ecma/builtin-objects/ecma-builtin-function-prototype.inc.h
+@@ -35,11 +35,12 @@ NUMBER_VALUE (LIT_MAGIC_STRING_LENGTH,
+               0,
+               ECMA_PROPERTY_FIXED)
+ 
++#ifndef CONFIG_MICRO_PROFILE
+ /* Routine properties:
+  *  (property name, C routine name, arguments number or NON_FIXED, value of the routine's length property) */
+ ROUTINE (LIT_MAGIC_STRING_TO_STRING_UL, ecma_builtin_function_prototype_object_to_string, 0, 0)
+ ROUTINE (LIT_MAGIC_STRING_APPLY, ecma_builtin_function_prototype_object_apply, 2, 2)
+ ROUTINE (LIT_MAGIC_STRING_CALL, ecma_builtin_function_prototype_object_call, NON_FIXED, 1)
+ ROUTINE (LIT_MAGIC_STRING_BIND, ecma_builtin_function_prototype_object_bind, NON_FIXED, 1)
+-
++#endif /* !CONFIG_MICRO_PROFILE */
+ #include "ecma-builtin-helpers-macro-undefs.inc.h"
+diff --git a/jerry-core/ecma/builtin-objects/ecma-builtin-global.c b/jerry-core/ecma/builtin-objects/ecma-builtin-global.c
+index 293e686..035ee5a 100644
+--- a/jerry-core/ecma/builtin-objects/ecma-builtin-global.c
++++ b/jerry-core/ecma/builtin-objects/ecma-builtin-global.c
+@@ -47,6 +47,7 @@
+  * @{
+  */
+ 
++#ifndef CONFIG_MICRO_PROFILE
+ /**
+  * The Global object's 'eval' routine
+  *
+@@ -87,6 +88,8 @@ ecma_builtin_global_object_eval (ecma_value_t this_arg, /**< this argument */
+   return ret_value;
+ } /* ecma_builtin_global_object_eval */
+ 
++#endif /* !CONFIG_MICRO_PROFILE */
++#ifndef CONFIG_MICRO_PROFILE
+ /**
+  * The Global object's 'parseInt' routine
+  *
+@@ -1082,6 +1085,8 @@ ecma_builtin_global_object_encode_uri_component (ecma_value_t this_arg, /**< thi
+   return ecma_builtin_global_object_encode_uri_helper (uri_component, unescaped_uri_component_set);
+ } /* ecma_builtin_global_object_encode_uri_component */
+ 
++#endif /* !CONFIG_MICRO_PROFILE */
++
+ #ifndef CONFIG_DISABLE_ANNEXB_BUILTIN
+ 
+ /**
+diff --git a/jerry-core/ecma/builtin-objects/ecma-builtin-global.inc.h b/jerry-core/ecma/builtin-objects/ecma-builtin-global.inc.h
+index 1339e91..670ef52 100644
+--- a/jerry-core/ecma/builtin-objects/ecma-builtin-global.inc.h
++++ b/jerry-core/ecma/builtin-objects/ecma-builtin-global.inc.h
+@@ -207,7 +207,7 @@ OBJECT_VALUE (LIT_MAGIC_STRING_MAP_UL,
+ 
+ /* Routine properties:
+  *  (property name, C routine name, arguments number or NON_FIXED, value of the routine's length property) */
+-
++#ifndef CONFIG_MICRO_PROFILE
+ ROUTINE (LIT_MAGIC_STRING_EVAL, ecma_builtin_global_object_eval, 1, 1)
+ ROUTINE (LIT_MAGIC_STRING_PARSE_FLOAT, ecma_builtin_global_object_parse_float, 1, 1)
+ ROUTINE (LIT_MAGIC_STRING_IS_NAN, ecma_builtin_global_object_is_nan, 1, 1)
+@@ -217,7 +217,7 @@ ROUTINE (LIT_MAGIC_STRING_DECODE_URI_COMPONENT, ecma_builtin_global_object_decod
+ ROUTINE (LIT_MAGIC_STRING_ENCODE_URI, ecma_builtin_global_object_encode_uri, 1, 1)
+ ROUTINE (LIT_MAGIC_STRING_ENCODE_URI_COMPONENT, ecma_builtin_global_object_encode_uri_component, 1, 1)
+ ROUTINE (LIT_MAGIC_STRING_PARSE_INT, ecma_builtin_global_object_parse_int, 2, 2)
+-
++#endif /* !CONFIG_MICRO_PROFILE */
+ #ifndef CONFIG_DISABLE_ANNEXB_BUILTIN
+ ROUTINE (LIT_MAGIC_STRING_ESCAPE, ecma_builtin_global_object_escape, 1, 1)
+ ROUTINE (LIT_MAGIC_STRING_UNESCAPE, ecma_builtin_global_object_unescape, 1, 1)
+diff --git a/jerry-core/ecma/builtin-objects/ecma-builtin-helpers-error.c b/jerry-core/ecma/builtin-objects/ecma-builtin-helpers-error.c
+index c97af8c..5c16ec2 100644
+--- a/jerry-core/ecma/builtin-objects/ecma-builtin-helpers-error.c
++++ b/jerry-core/ecma/builtin-objects/ecma-builtin-helpers-error.c
+@@ -43,7 +43,9 @@ ecma_builtin_helper_error_dispatch_call (ecma_standard_error_t error_type, /**<
+                                          ecma_length_t arguments_list_len) /**< number of arguments */
+ {
+   JERRY_ASSERT (arguments_list_len == 0 || arguments_list_p != NULL);
+-
++#ifdef CONFIG_MICRO_PROFILE
++  return ecma_make_object_value (ecma_new_standard_error (error_type));
++#else
+   if (arguments_list_len != 0
+       && !ecma_is_value_undefined (arguments_list_p[0]))
+   {
+@@ -68,10 +70,10 @@ ecma_builtin_helper_error_dispatch_call (ecma_standard_error_t error_type, /**<
+ 
+     return ecma_make_object_value (new_error_object_p);
+   }
++#endif /* CONFIG_MICRO_PROFILE */
+ } /* ecma_builtin_helper_error_dispatch_call */
+ 
+ /**
+  * @}
+  * @}
+  */
+-
+diff --git a/jerry-core/ecma/builtin-objects/ecma-builtin-number-prototype.c b/jerry-core/ecma/builtin-objects/ecma-builtin-number-prototype.c
+index ceada68..58b9dab 100644
+--- a/jerry-core/ecma/builtin-objects/ecma-builtin-number-prototype.c
++++ b/jerry-core/ecma/builtin-objects/ecma-builtin-number-prototype.c
+@@ -311,7 +311,11 @@ ecma_builtin_number_prototype_object_to_string (ecma_value_t this_arg, /**< this
+         ecma_number_t counter = this_arg_number;
+         while (counter >= radix)
+         {
++#ifdef CONFIG_REDUCE_FLOAT_STRINGIFY
++          counter /= (ecma_number_t) radix;
++#else /* !CONFIG_REDUCE_FLOAT_STRINGIFY */
+           counter /= radix;
++#endif /* CONFIG_REDUCE_FLOAT_STRINGIFY */
+           magnitude++;
+         }
+ 
+diff --git a/jerry-core/ecma/builtin-objects/ecma-builtin-object-prototype.c b/jerry-core/ecma/builtin-objects/ecma-builtin-object-prototype.c
+index 0143c43..b61aab7 100644
+--- a/jerry-core/ecma/builtin-objects/ecma-builtin-object-prototype.c
++++ b/jerry-core/ecma/builtin-objects/ecma-builtin-object-prototype.c
+@@ -44,6 +44,8 @@
+  * @{
+  */
+ 
++#ifndef CONFIG_MICRO_PROFILE
++
+ /**
+  * The Object.prototype object's 'toString' routine
+  *
+@@ -254,6 +256,7 @@ ecma_builtin_object_prototype_object_property_is_enumerable (ecma_value_t this_a
+   return return_value;
+ } /* ecma_builtin_object_prototype_object_property_is_enumerable */
+ 
++#endif /* !CONFIG_MICRO_PROFILE */
+ /**
+  * @}
+  * @}
+diff --git a/jerry-core/ecma/builtin-objects/ecma-builtin-object-prototype.inc.h b/jerry-core/ecma/builtin-objects/ecma-builtin-object-prototype.inc.h
+index 66f0c74..98a7b62 100644
+--- a/jerry-core/ecma/builtin-objects/ecma-builtin-object-prototype.inc.h
++++ b/jerry-core/ecma/builtin-objects/ecma-builtin-object-prototype.inc.h
+@@ -27,6 +27,7 @@ OBJECT_VALUE (LIT_MAGIC_STRING_CONSTRUCTOR,
+               ECMA_BUILTIN_ID_OBJECT,
+               ECMA_PROPERTY_CONFIGURABLE_WRITABLE)
+ 
++#ifndef CONFIG_MICRO_PROFILE
+ /* Routine properties:
+  *  (property name, C routine name, arguments number or NON_FIXED, value of the routine's length property) */
+ ROUTINE (LIT_MAGIC_STRING_TO_STRING_UL, ecma_builtin_object_prototype_object_to_string, 0, 0)
+@@ -35,5 +36,6 @@ ROUTINE (LIT_MAGIC_STRING_TO_LOCALE_STRING_UL, ecma_builtin_object_prototype_obj
+ ROUTINE (LIT_MAGIC_STRING_HAS_OWN_PROPERTY_UL, ecma_builtin_object_prototype_object_has_own_property, 1, 1)
+ ROUTINE (LIT_MAGIC_STRING_IS_PROTOTYPE_OF_UL, ecma_builtin_object_prototype_object_is_prototype_of, 1, 1)
+ ROUTINE (LIT_MAGIC_STRING_PROPERTY_IS_ENUMERABLE_UL, ecma_builtin_object_prototype_object_property_is_enumerable, 1, 1)
++#endif /* !CONFIG_MICRO_PROFILE */
+ 
+ #include "ecma-builtin-helpers-macro-undefs.inc.h"
+diff --git a/jerry-core/ecma/builtin-objects/ecma-builtin-object.c b/jerry-core/ecma/builtin-objects/ecma-builtin-object.c
+index 5db39c0..c57212b 100644
+--- a/jerry-core/ecma/builtin-objects/ecma-builtin-object.c
++++ b/jerry-core/ecma/builtin-objects/ecma-builtin-object.c
+@@ -52,6 +52,7 @@ ecma_value_t
+ ecma_builtin_object_dispatch_call (const ecma_value_t *arguments_list_p, /**< arguments list */
+                                    ecma_length_t arguments_list_len) /**< number of arguments */
+ {
++#ifndef CONFIG_MICRO_PROFILE
+   JERRY_ASSERT (arguments_list_len == 0 || arguments_list_p != NULL);
+ 
+   ecma_value_t ret_value = ECMA_VALUE_EMPTY;
+@@ -68,6 +69,10 @@ ecma_builtin_object_dispatch_call (const ecma_value_t *arguments_list_p, /**< ar
+   }
+ 
+   return ret_value;
++#else
++  JERRY_UNUSED_2 (arguments_list_p, arguments_list_len);
++  return ECMA_VALUE_ERROR;
++#endif /* !CONFIG_MICRO_PROFILE */
+ } /* ecma_builtin_object_dispatch_call */
+ 
+ /**
+@@ -79,6 +84,7 @@ ecma_value_t
+ ecma_builtin_object_dispatch_construct (const ecma_value_t *arguments_list_p, /**< arguments list */
+                                         ecma_length_t arguments_list_len) /**< number of arguments */
+ {
++#ifndef CONFIG_MICRO_PROFILE
+   JERRY_ASSERT (arguments_list_len == 0 || arguments_list_p != NULL);
+ 
+   if (arguments_list_len == 0)
+@@ -91,8 +97,14 @@ ecma_builtin_object_dispatch_construct (const ecma_value_t *arguments_list_p, /*
+   {
+     return ecma_op_create_object_object_arg (arguments_list_p[0]);
+   }
++#else
++    JERRY_UNUSED_2 (arguments_list_p, arguments_list_len);
++    return ECMA_VALUE_ERROR;
++#endif /* !CONFIG_MICRO_PROFILE */
+ } /* ecma_builtin_object_dispatch_construct */
+ 
++#ifndef CONFIG_MICRO_PROFILE
++
+ /**
+  * The Object object's 'getPrototypeOf' routine
+  *
+@@ -935,6 +947,8 @@ ecma_builtin_object_object_define_property (ecma_value_t this_arg, /**< 'this' a
+   return ret_value;
+ } /* ecma_builtin_object_object_define_property */
+ 
++#endif /* !CONFIG_MICRO_PROFILE */
++
+ /**
+  * @}
+  * @}
+diff --git a/jerry-core/ecma/builtin-objects/ecma-builtin-object.inc.h b/jerry-core/ecma/builtin-objects/ecma-builtin-object.inc.h
+index 8de27d4..df8d3a0 100644
+--- a/jerry-core/ecma/builtin-objects/ecma-builtin-object.inc.h
++++ b/jerry-core/ecma/builtin-objects/ecma-builtin-object.inc.h
+@@ -35,6 +35,7 @@ OBJECT_VALUE (LIT_MAGIC_STRING_PROTOTYPE,
+               ECMA_BUILTIN_ID_OBJECT_PROTOTYPE,
+               ECMA_PROPERTY_FIXED)
+ 
++#ifndef CONFIG_MICRO_PROFILE
+ /* Routine properties:
+  *  (property name, C routine name, arguments number or NON_FIXED, value of the routine's length property) */
+ ROUTINE (LIT_MAGIC_STRING_GET_PROTOTYPE_OF_UL, ecma_builtin_object_object_get_prototype_of, 1, 1)
+@@ -50,6 +51,7 @@ ROUTINE (LIT_MAGIC_STRING_GET_OWN_PROPERTY_DESCRIPTOR_UL, ecma_builtin_object_ob
+ ROUTINE (LIT_MAGIC_STRING_CREATE, ecma_builtin_object_object_create, 2, 2)
+ ROUTINE (LIT_MAGIC_STRING_DEFINE_PROPERTIES_UL, ecma_builtin_object_object_define_properties, 2, 2)
+ ROUTINE (LIT_MAGIC_STRING_DEFINE_PROPERTY_UL, ecma_builtin_object_object_define_property, 3, 3)
++#endif /* !CONFIG_MICRO_PROFILE */
+ 
+ #ifndef CONFIG_DISABLE_ES2015_BUILTIN
+ ROUTINE (LIT_MAGIC_STRING_SET_PROTOTYPE_OF_UL, ecma_builtin_object_object_set_prototype_of, 2, 2)
+diff --git a/jerry-core/ecma/builtin-objects/ecma-builtins.c b/jerry-core/ecma/builtin-objects/ecma-builtins.c
+index 0fd75f9..fc3e3b5 100644
+--- a/jerry-core/ecma/builtin-objects/ecma-builtins.c
++++ b/jerry-core/ecma/builtin-objects/ecma-builtins.c
+@@ -897,6 +897,7 @@ ecma_builtin_list_lazy_property_names (ecma_object_t *object_p, /**< a built-in
+   }
+ } /* ecma_builtin_list_lazy_property_names */
+ 
++#ifndef CONFIG_MICRO_PROFILE
+ /**
+  * Dispatcher of built-in routines
+  *
+@@ -918,6 +919,7 @@ ecma_builtin_dispatch_routine (ecma_builtin_id_t builtin_object_id, /**< built-i
+                                                    arguments_list_p,
+                                                    arguments_list_len);
+ } /* ecma_builtin_dispatch_routine */
++#endif /* !CONFIG_MICRO_PROFILE */
+ 
+ /**
+  * Handle calling [[Call]] of built-in object
+@@ -930,6 +932,10 @@ ecma_builtin_dispatch_call (ecma_object_t *obj_p, /**< built-in object */
+                             const ecma_value_t *arguments_list_p, /**< arguments list */
+                             ecma_length_t arguments_list_len) /**< arguments list length */
+ {
++#ifdef CONFIG_MICRO_PROFILE
++  JERRY_UNUSED_4 (obj_p, this_arg_value, arguments_list_p, arguments_list_len);
++  return ECMA_VALUE_UNDEFINED;
++#else
+   JERRY_ASSERT (ecma_get_object_type (obj_p) == ECMA_OBJECT_TYPE_FUNCTION);
+   JERRY_ASSERT (ecma_get_object_is_builtin (obj_p));
+ 
+@@ -954,6 +960,7 @@ ecma_builtin_dispatch_call (ecma_object_t *obj_p, /**< built-in object */
+   JERRY_ASSERT (!ecma_is_value_empty (ret_value));
+ 
+   return ret_value;
++#endif /* !CONFIG_MICRO_PROFILE */
+ } /* ecma_builtin_dispatch_call */
+ 
+ /**
+diff --git a/jerry-core/ecma/operations/ecma-conversion.c b/jerry-core/ecma/operations/ecma-conversion.c
+index 4a5dbf5..a785424 100644
+--- a/jerry-core/ecma/operations/ecma-conversion.c
++++ b/jerry-core/ecma/operations/ecma-conversion.c
+@@ -310,7 +310,7 @@ ecma_get_number (ecma_value_t value, /**< ecma value*/
+ {
+   if (ecma_is_value_integer_number (value))
+   {
+-    *number_p = ecma_get_integer_from_value (value);
++    *number_p = (ecma_number_t) ecma_get_integer_from_value (value);
+     return ECMA_VALUE_EMPTY;
+   }
+ 
+diff --git a/jerry-core/ecma/operations/ecma-eval.c b/jerry-core/ecma/operations/ecma-eval.c
+index a149c24..4627aab 100644
+--- a/jerry-core/ecma/operations/ecma-eval.c
++++ b/jerry-core/ecma/operations/ecma-eval.c
+@@ -24,6 +24,8 @@
+ #include "vm.h"
+ #include "jcontext.h"
+ 
++#ifndef CONFIG_MICRO_PROFILE
++
+ /** \addtogroup ecma ECMA
+  * @{
+  *
+@@ -112,7 +114,6 @@ ecma_op_eval_chars_buffer (const lit_utf8_byte_t *code_p, /**< code characters b
+   {
+     return parse_status;
+   }
+-
+   return vm_run_eval (bytecode_data_p, parse_opts);
+ #else /* JERRY_DISABLE_JS_PARSER */
+   JERRY_UNUSED (code_p);
+@@ -123,6 +124,7 @@ ecma_op_eval_chars_buffer (const lit_utf8_byte_t *code_p, /**< code characters b
+ #endif /* !JERRY_DISABLE_JS_PARSER */
+ } /* ecma_op_eval_chars_buffer */
+ 
++#endif /* !CONFIG_MICRO_PROFILE */
+ /**
+  * @}
+  * @}
+diff --git a/jerry-core/ecma/operations/ecma-exceptions.c b/jerry-core/ecma/operations/ecma-exceptions.c
+index 1200e4d..1efc506 100644
+--- a/jerry-core/ecma/operations/ecma-exceptions.c
++++ b/jerry-core/ecma/operations/ecma-exceptions.c
+@@ -188,6 +188,7 @@ ecma_get_error_type (ecma_object_t *error_object) /**< possible error object */
+   return ECMA_ERROR_NONE;
+ } /* ecma_get_error_type */
+ 
++
+ /**
+  * Standard ecma-error object constructor.
+  *
+@@ -199,7 +200,8 @@ ecma_new_standard_error_with_message (ecma_standard_error_t error_type, /**< nat
+                                       ecma_string_t *message_string_p) /**< message string */
+ {
+   ecma_object_t *new_error_obj_p = ecma_new_standard_error (error_type);
+-
++  JERRY_UNUSED (message_string_p);
++#ifndef CONFIG_MICRO_PROFILE
+   ecma_property_value_t *prop_value_p;
+   prop_value_p = ecma_create_named_data_property (new_error_obj_p,
+                                                   ecma_get_magic_string (LIT_MAGIC_STRING_MESSAGE),
+@@ -208,7 +210,7 @@ ecma_new_standard_error_with_message (ecma_standard_error_t error_type, /**< nat
+ 
+   ecma_ref_ecma_string (message_string_p);
+   prop_value_p->value = ecma_make_string_value (message_string_p);
+-
++#endif /* !CONFIG_MICRO_PROFILE */
+   return new_error_obj_p;
+ } /* ecma_new_standard_error_with_message */
+ 
+@@ -224,6 +226,10 @@ ecma_raise_standard_error (ecma_standard_error_t error_type, /**< error type */
+ {
+   ecma_object_t *error_obj_p;
+ 
++#ifdef CONFIG_MICRO_PROFILE
++  JERRY_UNUSED (msg_p);
++  error_obj_p = ecma_new_standard_error (error_type);
++#else
+   if (msg_p != NULL)
+   {
+     ecma_string_t *error_msg_p = ecma_new_ecma_string_from_utf8 (msg_p,
+@@ -235,6 +241,7 @@ ecma_raise_standard_error (ecma_standard_error_t error_type, /**< error type */
+   {
+     error_obj_p = ecma_new_standard_error (error_type);
+   }
++#endif /* !CONFIG_MICRO_PROFILE */
+ 
+   JERRY_CONTEXT (error_value) = ecma_make_object_value (error_obj_p);
+   JERRY_CONTEXT (status_flags) |= ECMA_STATUS_EXCEPTION;
+diff --git a/jerry-core/ecma/operations/ecma-objects.c b/jerry-core/ecma/operations/ecma-objects.c
+index f730481..93fc683 100644
+--- a/jerry-core/ecma/operations/ecma-objects.c
++++ b/jerry-core/ecma/operations/ecma-objects.c
+@@ -1021,6 +1021,10 @@ ecma_op_object_delete (ecma_object_t *obj_p, /**< the object */
+                        ecma_string_t *property_name_p, /**< property name */
+                        bool is_throw) /**< flag that controls failure handling */
+ {
++#ifdef CONFIG_MICRO_PROFILE
++  JERRY_UNUSED_3 (obj_p, property_name_p, is_throw);
++  return ECMA_VALUE_UNDEFINED;
++#else
+   JERRY_ASSERT (obj_p != NULL
+                 && !ecma_is_lexical_environment (obj_p));
+   JERRY_ASSERT (property_name_p != NULL);
+@@ -1042,6 +1046,7 @@ ecma_op_object_delete (ecma_object_t *obj_p, /**< the object */
+   return ecma_op_general_object_delete (obj_p,
+                                         property_name_p,
+                                         is_throw);
++#endif /* CONFIG_MICRO_PROFILE */
+ } /* ecma_op_object_delete */
+ 
+ /**
+diff --git a/jerry-core/include/jerryscript-compiler.h b/jerry-core/include/jerryscript-compiler.h
+index 726d986..e5f9e09 100644
+--- a/jerry-core/include/jerryscript-compiler.h
++++ b/jerry-core/include/jerryscript-compiler.h
+@@ -81,7 +81,9 @@ void * __cdecl _alloca (size_t _Size);
+  * Function attribute to inline function to all call sites.
+  */
+ #ifndef JERRY_ATTR_ALWAYS_INLINE
++#ifndef CONFIG_MICRO_PROFILE
+ #define JERRY_ATTR_ALWAYS_INLINE
++#endif /* !CONFIG_MICRO_PROFILE */
+ #endif /* !JERRY_ATTR_ALWAYS_INLINE */
+ 
+ /**
+diff --git a/jerry-core/lit/lit-char-helpers.c b/jerry-core/lit/lit-char-helpers.c
+index ac25d9e..5e1b8c0 100644
+--- a/jerry-core/lit/lit-char-helpers.c
++++ b/jerry-core/lit/lit-char-helpers.c
+@@ -14,13 +14,16 @@
+  */
+ 
+ #include "lit-char-helpers.h"
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+ #include "lit-unicode-ranges.inc.h"
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ #include "lit-strings.h"
+ 
+ #ifndef CONFIG_DISABLE_UNICODE_CASE_CONVERSION
+ #include "lit-unicode-conversions.inc.h"
+ #endif /* !CONFIG_DISABLE_UNICODE_CASE_CONVERSION */
+ 
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+ #define NUM_OF_ELEMENTS(array) (sizeof (array) / sizeof ((array)[0]))
+ 
+ /**
+@@ -101,6 +104,8 @@ search_char_in_interval_array (ecma_char_t c,               /**< code unit */
+   return false;
+ } /* search_char_in_interval_array */
+ 
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
++
+ /**
+  * Check if specified character is one of the Whitespace characters including those
+  * that fall into "Space, Separator" ("Zs") Unicode character category.
+@@ -120,6 +125,7 @@ lit_char_is_white_space (ecma_char_t c) /**< code unit */
+   }
+   else
+   {
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+     return (c == LIT_CHAR_NBSP
+             || c == LIT_CHAR_BOM
+             || (c >= lit_unicode_separator_char_interval_sps[0]
+@@ -127,6 +133,9 @@ lit_char_is_white_space (ecma_char_t c) /**< code unit */
+             || search_char_in_char_array (c,
+                                           lit_unicode_separator_chars,
+                                           NUM_OF_ELEMENTS (lit_unicode_separator_chars)));
++#else /* CONFIG_DISABLE_UTF8_CHARACTERS */
++  return (c == LIT_CHAR_NBSP || c == LIT_CHAR_BOM);
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+   }
+ } /* lit_char_is_white_space */
+ 
+@@ -145,6 +154,7 @@ lit_char_is_line_terminator (ecma_char_t c) /**< code unit */
+           || c == LIT_CHAR_PS);
+ } /* lit_char_is_line_terminator */
+ 
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+ /**
+  * Check if specified character is a unicode letter
+  *
+@@ -199,6 +209,8 @@ lit_char_is_unicode_non_letter_ident_part (ecma_char_t c) /**< code unit */
+                                         NUM_OF_ELEMENTS (lit_unicode_non_letter_ident_part_chars)));
+ } /* lit_char_is_unicode_non_letter_ident_part */
+ 
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
++
+ /**
+  * Checks whether the next UTF8 character is a valid identifier start.
+  *
+@@ -207,6 +219,7 @@ lit_char_is_unicode_non_letter_ident_part (ecma_char_t c) /**< code unit */
+ bool
+ lit_char_is_identifier_start (const uint8_t *src_p) /**< pointer to a vaild UTF8 character */
+ {
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   if (*src_p <= LIT_UTF8_1_BYTE_CODE_POINT_MAX)
+   {
+     return lit_char_is_identifier_start_character (*src_p);
+@@ -221,6 +234,9 @@ lit_char_is_identifier_start (const uint8_t *src_p) /**< pointer to a vaild UTF8
+   }
+ 
+   return lit_char_is_identifier_start_character (lit_utf8_peek_next (src_p));
++#else /* CONFIG_DISABLE_UTF8_CHARACTERS */
++  return lit_char_is_identifier_start_character (*src_p);
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_char_is_identifier_start */
+ 
+ /**
+@@ -239,8 +255,11 @@ lit_char_is_identifier_start_character (uint16_t chr) /**< EcmaScript character
+             || chr == LIT_CHAR_DOLLAR_SIGN
+             || chr == LIT_CHAR_UNDERSCORE);
+   }
+-
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   return lit_char_is_unicode_letter (chr);
++#else /* CONFIG_DISABLE_UTF8_CHARACTERS */
++  return false;
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_char_is_identifier_start_character */
+ 
+ /**
+@@ -251,6 +270,7 @@ lit_char_is_identifier_start_character (uint16_t chr) /**< EcmaScript character
+ bool
+ lit_char_is_identifier_part (const uint8_t *src_p) /**< pointer to a vaild UTF8 character */
+ {
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   if (*src_p <= LIT_UTF8_1_BYTE_CODE_POINT_MAX)
+   {
+     return lit_char_is_identifier_part_character (*src_p);
+@@ -265,6 +285,9 @@ lit_char_is_identifier_part (const uint8_t *src_p) /**< pointer to a vaild UTF8
+   }
+ 
+   return lit_char_is_identifier_part_character (lit_utf8_peek_next (src_p));
++#else /* CONFIG_DISABLE_UTF8_CHARACTERS */
++  return lit_char_is_identifier_part_character (*src_p);
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_char_is_identifier_part */
+ 
+ /**
+@@ -284,9 +307,12 @@ lit_char_is_identifier_part_character (uint16_t chr) /**< EcmaScript character *
+             || chr == LIT_CHAR_DOLLAR_SIGN
+             || chr == LIT_CHAR_UNDERSCORE);
+   }
+-
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   return (lit_char_is_unicode_letter (chr)
+           || lit_char_is_unicode_non_letter_ident_part (chr));
++#else /* CONFIG_DISABLE_UTF8_CHARACTERS */
++  return false;
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_char_is_identifier_part_character */
+ 
+ /**
+diff --git a/jerry-core/lit/lit-magic-strings.inc.h b/jerry-core/lit/lit-magic-strings.inc.h
+index b21a4a8..ab89608 100644
+--- a/jerry-core/lit/lit-magic-strings.inc.h
++++ b/jerry-core/lit/lit-magic-strings.inc.h
+@@ -101,12 +101,16 @@ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_ACOS, "acos")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_ASIN, "asin")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_ATAN, "atan")
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_BIND, "bind")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_CALL, "call")
++#endif
+ #if !defined (CONFIG_DISABLE_MATH_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_CEIL, "ceil")
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_EVAL, "eval")
++#endif
+ #if !defined (CONFIG_DISABLE_REGEXP_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_EXEC, "exec")
+ #endif
+@@ -118,7 +122,9 @@ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_FROM, "from")
+ || !defined (CONFIG_DISABLE_ES2015_TYPEDARRAY_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_JOIN, "join")
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_KEYS, "keys")
++#endif
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_NAME, "name")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_NULL, "null")
+ #if !defined (CONFIG_DISABLE_ARRAY_BUILTIN)
+@@ -127,7 +133,9 @@ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_PUSH, "push")
+ #if !defined (CONFIG_DISABLE_ES2015_PROMISE_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_RACE, "race")
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_SEAL, "seal")
++#endif
+ #if !defined (CONFIG_DISABLE_ES2015_MAP_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_SIZE, "size")
+ #endif
+@@ -155,7 +163,9 @@ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_ERROR_UL, "Error")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_LOG2E_U, "LOG2E")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_SQRT2_U, "SQRT2")
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_APPLY, "apply")
++#endif
+ #if !defined (CONFIG_DISABLE_MATH_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_ATAN2, "atan2")
+ #endif
+@@ -180,7 +190,9 @@ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_INDEX, "index")
+ #if !defined (CONFIG_DISABLE_REGEXP_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_INPUT, "input")
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_IS_NAN, "isNaN")
++#endif
+ #if !defined (CONFIG_DISABLE_REGEXP_BUILTIN) && !defined (CONFIG_DISABLE_STRING_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_MATCH, "match")
+ #endif
+@@ -222,7 +234,9 @@ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_CHAR_AT_UL, "charAt")
+ || !defined (CONFIG_DISABLE_STRING_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_CONCAT, "concat")
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_CREATE, "create")
++#endif
+ #if !defined (CONFIG_DISABLE_ES2015_MAP_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_DELETE, "delete")
+ #endif
+@@ -233,7 +247,9 @@ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_ESCAPE, "escape")
+ || !defined (CONFIG_DISABLE_ES2015_TYPEDARRAY_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_FILTER, "filter")
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_FREEZE, "freeze")
++#endif
+ #if !defined (CONFIG_DISABLE_DATE_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_GET_DAY_UL, "getDay")
+ #endif
+@@ -337,10 +353,12 @@ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_FUNCTION, "function")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_GET_HOURS_UL, "getHours")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_GET_MONTH_UL, "getMonth")
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_IS_FINITE, "isFinite")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_IS_FROZEN_UL, "isFrozen")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_IS_SEALED_UL, "isSealed")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_PARSE_INT, "parseInt")
++#endif
+ #if !defined (CONFIG_DISABLE_DATE_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_SET_HOURS_UL, "setHours")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_SET_MONTH_UL, "setMonth")
+@@ -370,8 +388,10 @@ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_TYPE_ERROR_UL, "TypeError")
+ #endif
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_UNDEFINED_UL, "Undefined")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_ARGUMENTS, "arguments")
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_DECODE_URI, "decodeURI")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_ENCODE_URI, "encodeURI")
++#endif
+ #if !defined (CONFIG_DISABLE_DATE_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_GET_UTC_DAY_UL, "getUTCDay")
+ #endif
+@@ -412,7 +432,9 @@ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_GET_UTC_DATE_UL, "getUTCDate")
+ #if !defined (CONFIG_DISABLE_REGEXP_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_IGNORECASE_UL, "ignoreCase")
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_PARSE_FLOAT, "parseFloat")
++#endif
+ #if !defined (CONFIG_DISABLE_DATE_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_SET_MINUTES_UL, "setMinutes")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_SET_SECONDS_UL, "setSeconds")
+@@ -478,14 +500,18 @@ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_CONFIGURABLE, "configurable")
+ #if !defined (CONFIG_DISABLE_STRING_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_FROM_CHAR_CODE_UL, "fromCharCode")
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_IS_EXTENSIBLE, "isExtensible")
++#endif
+ #if !defined (CONFIG_DISABLE_DATE_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_TO_DATE_STRING_UL, "toDateString")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_TO_TIME_STRING_UL, "toTimeString")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_GET_UTC_MINUTES_UL, "getUTCMinutes")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_GET_UTC_SECONDS_UL, "getUTCSeconds")
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_IS_PROTOTYPE_OF_UL, "isPrototypeOf")
++#endif
+ #if !defined (CONFIG_DISABLE_STRING_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_LOCALE_COMPARE_UL, "localeCompare")
+ #endif
+@@ -499,12 +525,16 @@ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_TO_EXPONENTIAL_UL, "toExponential")
+ #if !defined (CONFIG_DISABLE_ERROR_BUILTINS)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_REFERENCE_ERROR_UL, "ReferenceError")
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_DEFINE_PROPERTY_UL, "defineProperty")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_GET_PROTOTYPE_OF_UL, "getPrototypeOf")
++#endif
+ #if !defined (CONFIG_DISABLE_DATE_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_GET_UTC_FULL_YEAR_UL, "getUTCFullYear")
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_HAS_OWN_PROPERTY_UL, "hasOwnProperty")
++#endif
+ #if !defined (CONFIG_DISABLE_ES2015_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_SET_PROTOTYPE_OF_UL, "setPrototypeOf")
+ #endif
+@@ -516,7 +546,9 @@ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_TO_LOCALE_STRING_UL, "toLocaleString")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_GET_MILLISECONDS_UL, "getMilliseconds")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_SET_MILLISECONDS_UL, "setMilliseconds")
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_DEFINE_PROPERTIES_UL, "defineProperties")
++#endif
+ #if !defined (CONFIG_DISABLE_ES2015_TYPEDARRAY_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_BYTES_PER_ELEMENT_U, "BYTES_PER_ELEMENT")
+ #endif
+@@ -530,23 +562,29 @@ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_UINT8_CLAMPED_ARRAY_UL, "Uint8ClampedArra
+ #if !defined (CONFIG_DISABLE_DATE_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_GET_TIMEZONE_OFFSET_UL, "getTimezoneOffset")
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_PREVENT_EXTENSIONS_UL, "preventExtensions")
++#endif
+ #if !defined (CONFIG_DISABLE_STRING_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_TO_LOCALE_LOWER_CASE_UL, "toLocaleLowerCase")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_TO_LOCALE_UPPER_CASE_UL, "toLocaleUpperCase")
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_DECODE_URI_COMPONENT, "decodeURIComponent")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_ENCODE_URI_COMPONENT, "encodeURIComponent")
++#endif
+ #if !defined (CONFIG_DISABLE_DATE_BUILTIN)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_GET_UTC_MILLISECONDS_UL, "getUTCMilliseconds")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_SET_UTC_MILLISECONDS_UL, "setUTCMilliseconds")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_TO_LOCALE_DATE_STRING_UL, "toLocaleDateString")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_TO_LOCALE_TIME_STRING_UL, "toLocaleTimeString")
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_GET_OWN_PROPERTY_NAMES_UL, "getOwnPropertyNames")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_PROPERTY_IS_ENUMERABLE_UL, "propertyIsEnumerable")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING_GET_OWN_PROPERTY_DESCRIPTOR_UL, "getOwnPropertyDescriptor")
+ LIT_MAGIC_STRING_DEF (LIT_MAGIC_STRING__FUNCTION_TO_STRING, "function(){/* ecmascript */}")
++#endif
+ 
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (0, LIT_MAGIC_STRING__EMPTY)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (1, LIT_MAGIC_STRING_SPACE_CHAR)
+@@ -613,20 +651,88 @@ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (12, LIT_MAGIC_STRING_CONFIGURABLE)
+ #endif
+ #if !defined (CONFIG_DISABLE_DATE_BUILTIN)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (13, LIT_MAGIC_STRING_GET_UTC_MINUTES_UL)
+-#else
++#elif !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (13, LIT_MAGIC_STRING_IS_PROTOTYPE_OF_UL)
++#elif !defined (CONFIG_DISABLE_STRING_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (13, LIT_MAGIC_STRING_LOCALE_COMPARE_UL)
++#elif !defined (CONFIG_DISABLE_DATE_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (13, LIT_MAGIC_STRING_SET_UTC_MINUTES_UL)
++#elif !defined (CONFIG_DISABLE_NUMBER_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (13, LIT_MAGIC_STRING_TO_EXPONENTIAL_UL)
++#elif !defined (CONFIG_DISABLE_ERROR_BUILTINS)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (13, LIT_MAGIC_STRING_REFERENCE_ERROR_UL)
++#elif !defined (CONFIG_MICRO_PROFILE)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (13, LIT_MAGIC_STRING_DEFINE_PROPERTY_UL)
++#elif !defined (CONFIG_DISABLE_DATE_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (13, LIT_MAGIC_STRING_GET_UTC_FULL_YEAR_UL)
++#elif !defined (CONFIG_MICRO_PROFILE)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (13, LIT_MAGIC_STRING_HAS_OWN_PROPERTY_UL)
++#elif !defined (CONFIG_DISABLE_ES2015_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (13, LIT_MAGIC_STRING_SET_PROTOTYPE_OF_UL)
++#elif !defined (CONFIG_DISABLE_DATE_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (13, LIT_MAGIC_STRING_SET_UTC_FULL_YEAR_UL)
++#else
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (13, LIT_MAGIC_STRING_TO_LOCALE_STRING_UL)
+ #endif
+ #if !defined (CONFIG_DISABLE_ERROR_BUILTINS)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (14, LIT_MAGIC_STRING_REFERENCE_ERROR_UL)
+-#else
++#elif !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (14, LIT_MAGIC_STRING_DEFINE_PROPERTY_UL)
++#elif !defined (CONFIG_DISABLE_DATE_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (14, LIT_MAGIC_STRING_GET_UTC_FULL_YEAR_UL)
++#elif !defined (CONFIG_MICRO_PROFILE)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (14, LIT_MAGIC_STRING_HAS_OWN_PROPERTY_UL)
++#elif !defined (CONFIG_DISABLE_ES2015_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (14, LIT_MAGIC_STRING_SET_PROTOTYPE_OF_UL)
++#elif !defined (CONFIG_DISABLE_DATE_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (14, LIT_MAGIC_STRING_SET_UTC_FULL_YEAR_UL)
++#else
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (14, LIT_MAGIC_STRING_TO_LOCALE_STRING_UL)
+ #endif
+ #if !defined (CONFIG_DISABLE_DATE_BUILTIN)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (15, LIT_MAGIC_STRING_GET_MILLISECONDS_UL)
+-#else
++#elif !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (15, LIT_MAGIC_STRING_DEFINE_PROPERTIES_UL)
++#elif !defined (CONFIG_DISABLE_ES2015_TYPEDARRAY_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (15, LIT_MAGIC_STRING_BYTES_PER_ELEMENT_U)
++#elif !defined (CONFIG_DISABLE_NUMBER_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (15, LIT_MAGIC_STRING_NEGATIVE_INFINITY_U)
++#elif !defined (CONFIG_DISABLE_ES2015_TYPEDARRAY_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (15, LIT_MAGIC_STRING_UINT8_CLAMPED_ARRAY_UL)
++#elif !defined (CONFIG_DISABLE_DATE_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (15, LIT_MAGIC_STRING_GET_TIMEZONE_OFFSET_UL)
++#elif !defined (CONFIG_MICRO_PROFILE)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (15, LIT_MAGIC_STRING_PREVENT_EXTENSIONS_UL)
++#elif !defined (CONFIG_DISABLE_STRING_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (15, LIT_MAGIC_STRING_TO_LOCALE_LOWER_CASE_UL)
++#elif !defined (CONFIG_MICRO_PROFILE)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (15, LIT_MAGIC_STRING_DECODE_URI_COMPONENT)
++#elif !defined (CONFIG_DISABLE_DATE_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (15, LIT_MAGIC_STRING_GET_UTC_MILLISECONDS_UL)
++#elif !defined (CONFIG_MICRO_PROFILE)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (15, LIT_MAGIC_STRING_GET_OWN_PROPERTY_NAMES_UL)
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (16, LIT_MAGIC_STRING_DEFINE_PROPERTIES_UL)
++#elif !defined (CONFIG_DISABLE_ES2015_TYPEDARRAY_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (16, LIT_MAGIC_STRING_BYTES_PER_ELEMENT_U)
++#elif !defined (CONFIG_DISABLE_NUMBER_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (16, LIT_MAGIC_STRING_NEGATIVE_INFINITY_U)
++#elif !defined (CONFIG_DISABLE_ES2015_TYPEDARRAY_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (16, LIT_MAGIC_STRING_UINT8_CLAMPED_ARRAY_UL)
++#elif !defined (CONFIG_DISABLE_DATE_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (16, LIT_MAGIC_STRING_GET_TIMEZONE_OFFSET_UL)
++#elif !defined (CONFIG_MICRO_PROFILE)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (16, LIT_MAGIC_STRING_PREVENT_EXTENSIONS_UL)
++#elif !defined (CONFIG_DISABLE_STRING_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (16, LIT_MAGIC_STRING_TO_LOCALE_LOWER_CASE_UL)
++#elif !defined (CONFIG_MICRO_PROFILE)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (16, LIT_MAGIC_STRING_DECODE_URI_COMPONENT)
++#elif !defined (CONFIG_DISABLE_DATE_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (16, LIT_MAGIC_STRING_GET_UTC_MILLISECONDS_UL)
++#elif !defined (CONFIG_MICRO_PROFILE)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (16, LIT_MAGIC_STRING_GET_OWN_PROPERTY_NAMES_UL)
++#endif
+ #if !defined (CONFIG_DISABLE_ES2015_TYPEDARRAY_BUILTIN)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (17, LIT_MAGIC_STRING_BYTES_PER_ELEMENT_U)
+ #elif !defined (CONFIG_DISABLE_NUMBER_BUILTIN)
+@@ -635,17 +741,51 @@ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (17, LIT_MAGIC_STRING_NEGATIVE_INFINITY_
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (17, LIT_MAGIC_STRING_UINT8_CLAMPED_ARRAY_UL)
+ #elif !defined (CONFIG_DISABLE_DATE_BUILTIN)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (17, LIT_MAGIC_STRING_GET_TIMEZONE_OFFSET_UL)
+-#else
++#elif !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (17, LIT_MAGIC_STRING_PREVENT_EXTENSIONS_UL)
++#elif !defined (CONFIG_DISABLE_STRING_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (17, LIT_MAGIC_STRING_TO_LOCALE_LOWER_CASE_UL)
++#elif !defined (CONFIG_MICRO_PROFILE)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (17, LIT_MAGIC_STRING_DECODE_URI_COMPONENT)
++#elif !defined (CONFIG_DISABLE_DATE_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (17, LIT_MAGIC_STRING_GET_UTC_MILLISECONDS_UL)
++#elif !defined (CONFIG_MICRO_PROFILE)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (17, LIT_MAGIC_STRING_GET_OWN_PROPERTY_NAMES_UL)
+ #endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (18, LIT_MAGIC_STRING_DECODE_URI_COMPONENT)
++#elif !defined (CONFIG_DISABLE_DATE_BUILTIN)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (18, LIT_MAGIC_STRING_GET_UTC_MILLISECONDS_UL)
++#elif !defined (CONFIG_MICRO_PROFILE)
++LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (18, LIT_MAGIC_STRING_GET_OWN_PROPERTY_NAMES_UL)
++#endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (19, LIT_MAGIC_STRING_GET_OWN_PROPERTY_NAMES_UL)
++#endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (20, LIT_MAGIC_STRING_PROPERTY_IS_ENUMERABLE_UL)
++#endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (21, LIT_MAGIC_STRING_GET_OWN_PROPERTY_DESCRIPTOR_UL)
++#endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (22, LIT_MAGIC_STRING_GET_OWN_PROPERTY_DESCRIPTOR_UL)
++#endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (23, LIT_MAGIC_STRING_GET_OWN_PROPERTY_DESCRIPTOR_UL)
++#endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (24, LIT_MAGIC_STRING_GET_OWN_PROPERTY_DESCRIPTOR_UL)
++#endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (25, LIT_MAGIC_STRING__FUNCTION_TO_STRING)
++#endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (26, LIT_MAGIC_STRING__FUNCTION_TO_STRING)
++#endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (27, LIT_MAGIC_STRING__FUNCTION_TO_STRING)
++#endif
++#if !defined (CONFIG_MICRO_PROFILE)
+ LIT_MAGIC_STRING_FIRST_STRING_WITH_SIZE (28, LIT_MAGIC_STRING__FUNCTION_TO_STRING)
++#endif
+diff --git a/jerry-core/lit/lit-strings.c b/jerry-core/lit/lit-strings.c
+index 223d11b..406a7f8 100644
+--- a/jerry-core/lit/lit-strings.c
++++ b/jerry-core/lit/lit-strings.c
+@@ -31,6 +31,7 @@ bool
+ lit_is_valid_utf8_string (const lit_utf8_byte_t *utf8_buf_p, /**< utf-8 string */
+                           lit_utf8_size_t buf_size) /**< string size */
+ {
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   lit_utf8_size_t idx = 0;
+ 
+   bool is_prev_code_point_high_surrogate = false;
+@@ -116,6 +117,11 @@ lit_is_valid_utf8_string (const lit_utf8_byte_t *utf8_buf_p, /**< utf-8 string *
+   }
+ 
+   return true;
++#else /* CONFIG_DISABLE_UTF8_CHARACTERS */
++  JERRY_UNUSED (utf8_buf_p);
++  JERRY_UNUSED (buf_size);
++  return true;
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_is_valid_utf8_string */
+ 
+ /**
+@@ -128,6 +134,7 @@ bool
+ lit_is_valid_cesu8_string (const lit_utf8_byte_t *cesu8_buf_p, /**< cesu-8 string */
+                            lit_utf8_size_t buf_size) /**< string size */
+ {
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   lit_utf8_size_t idx = 0;
+ 
+   while (idx < buf_size)
+@@ -184,8 +191,12 @@ lit_is_valid_cesu8_string (const lit_utf8_byte_t *cesu8_buf_p, /**< cesu-8 strin
+ 
+     idx += extra_bytes_count;
+   }
+-
+   return true;
++#else /* CONFIG_DISABLE_UTF8_CHARACTERS */
++  JERRY_UNUSED (cesu8_buf_p);
++  JERRY_UNUSED (buf_size);
++  return true;
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_is_valid_cesu8_string */
+ 
+ /**
+@@ -210,6 +221,8 @@ lit_is_code_point_utf16_high_surrogate (lit_code_point_t code_point) /**< code p
+   return LIT_UTF16_HIGH_SURROGATE_MIN <= code_point && code_point <= LIT_UTF16_HIGH_SURROGATE_MAX;
+ } /* lit_is_code_point_utf16_high_surrogate */
+ 
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
++
+ /**
+  * Represents code point (>0xFFFF) as surrogate pair and returns its lower part
+  *
+@@ -243,6 +256,8 @@ convert_code_point_to_high_surrogate (lit_code_point_t code_point) /**< code poi
+   return (LIT_UTF16_HIGH_SURROGATE_MARKER | code_unit_bits);
+ } /* convert_code_point_to_high_surrogate */
+ 
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
++
+ /**
+  * Calculate size of a zero-terminated utf-8 string
+  *
+@@ -266,6 +281,7 @@ ecma_length_t
+ lit_utf8_string_length (const lit_utf8_byte_t *utf8_buf_p, /**< utf-8 string */
+                         lit_utf8_size_t utf8_buf_size) /**< string size */
+ {
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   ecma_length_t length = 0;
+   lit_utf8_size_t size = 0;
+ 
+@@ -278,6 +294,10 @@ lit_utf8_string_length (const lit_utf8_byte_t *utf8_buf_p, /**< utf-8 string */
+   JERRY_ASSERT (size == utf8_buf_size);
+ 
+   return length;
++#else
++  JERRY_UNUSED (utf8_buf_p);
++  return (ecma_length_t) utf8_buf_size;
++#endif /* CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_utf8_string_length */
+ 
+ /**
+@@ -289,6 +309,7 @@ lit_utf8_size_t
+ lit_get_utf8_size_of_cesu8_string (const lit_utf8_byte_t *cesu8_buf_p, /**< cesu-8 string */
+                                    lit_utf8_size_t cesu8_buf_size) /**< string size */
+ {
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   lit_utf8_size_t offset = 0;
+   lit_utf8_size_t utf8_buf_size = cesu8_buf_size;
+   ecma_char_t prev_ch = 0;
+@@ -309,6 +330,10 @@ lit_get_utf8_size_of_cesu8_string (const lit_utf8_byte_t *cesu8_buf_p, /**< cesu
+   JERRY_ASSERT (offset == cesu8_buf_size);
+ 
+   return utf8_buf_size;
++#else
++  JERRY_UNUSED (cesu8_buf_p);
++  return cesu8_buf_size;
++#endif /* CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_get_utf8_size_of_cesu8_string */
+ 
+ /**
+@@ -320,6 +345,7 @@ ecma_length_t
+ lit_get_utf8_length_of_cesu8_string (const lit_utf8_byte_t *cesu8_buf_p, /**< cesu-8 string */
+                                      lit_utf8_size_t cesu8_buf_size) /**< string size */
+ {
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   lit_utf8_size_t offset = 0;
+   ecma_length_t utf8_length = 0;
+   ecma_char_t prev_ch = 0;
+@@ -340,6 +366,10 @@ lit_get_utf8_length_of_cesu8_string (const lit_utf8_byte_t *cesu8_buf_p, /**< ce
+   JERRY_ASSERT (offset == cesu8_buf_size);
+ 
+   return utf8_length;
++#else
++    JERRY_UNUSED (cesu8_buf_p);
++    return cesu8_buf_size;
++  #endif /* CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_get_utf8_length_of_cesu8_string */
+ 
+ /**
+@@ -355,6 +385,7 @@ lit_read_code_point_from_utf8 (const lit_utf8_byte_t *buf_p, /**< buffer with ch
+   JERRY_ASSERT (buf_p && buf_size);
+ 
+   lit_utf8_byte_t c = buf_p[0];
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   if ((c & LIT_UTF8_1_BYTE_MASK) == LIT_UTF8_1_BYTE_MARKER)
+   {
+     *code_point = (lit_code_point_t) (c & LIT_UTF8_LAST_7_BITS_MASK);
+@@ -390,6 +421,10 @@ lit_read_code_point_from_utf8 (const lit_utf8_byte_t *buf_p, /**< buffer with ch
+ 
+   *code_point = ret;
+   return bytes_count;
++#else
++  *code_point = (lit_code_point_t) (c & LIT_UTF8_LAST_7_BITS_MASK);
++  return 1;
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_read_code_point_from_utf8 */
+ 
+ /**
+@@ -404,6 +439,7 @@ lit_read_code_unit_from_utf8 (const lit_utf8_byte_t *buf_p, /**< buffer with cha
+   JERRY_ASSERT (buf_p);
+ 
+   lit_utf8_byte_t c = buf_p[0];
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   if ((c & LIT_UTF8_1_BYTE_MASK) == LIT_UTF8_1_BYTE_MARKER)
+   {
+     *code_point = (ecma_char_t) (c & LIT_UTF8_LAST_7_BITS_MASK);
+@@ -433,6 +469,10 @@ lit_read_code_unit_from_utf8 (const lit_utf8_byte_t *buf_p, /**< buffer with cha
+   JERRY_ASSERT (ret <= LIT_UTF16_CODE_UNIT_MAX);
+   *code_point = (ecma_char_t) ret;
+   return bytes_count;
++#else
++    *code_point = (ecma_char_t) (c & LIT_UTF8_LAST_7_BITS_MASK);
++    return 1;
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_read_code_unit_from_utf8 */
+ 
+ /**
+@@ -466,6 +506,7 @@ lit_utf8_read_next (const lit_utf8_byte_t **buf_p) /**< [in,out] buffer with cha
+   return ch;
+ } /* lit_utf8_read_next */
+ 
++#ifndef CONFIG_MICRO_PROFILE
+ /**
+  * Decodes a unicode code unit from non-empty cesu-8-encoded buffer
+  *
+@@ -483,6 +524,8 @@ lit_utf8_read_prev (const lit_utf8_byte_t **buf_p) /**< [in,out] buffer with cha
+   return ch;
+ } /* lit_utf8_read_prev */
+ 
++#endif /* !CONFIG_MICRO_PROFILE */
++
+ /**
+  * Decodes a unicode code unit from non-empty cesu-8-encoded buffer
+  *
+@@ -523,7 +566,11 @@ lit_utf8_incr (const lit_utf8_byte_t **buf_p) /**< [in,out] buffer with characte
+ {
+   JERRY_ASSERT (*buf_p);
+ 
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   *buf_p += lit_get_unicode_char_size_by_utf8_first_byte (**buf_p);
++#else
++  *buf_p += 1;
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_utf8_incr */
+ 
+ /**
+@@ -533,6 +580,8 @@ void
+ lit_utf8_decr (const lit_utf8_byte_t **buf_p) /**< [in,out] buffer with characters */
+ {
+   JERRY_ASSERT (*buf_p);
++
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   const lit_utf8_byte_t *current_p = *buf_p;
+ 
+   do
+@@ -542,6 +591,9 @@ lit_utf8_decr (const lit_utf8_byte_t **buf_p) /**< [in,out] buffer with characte
+   while ((*(current_p) & LIT_UTF8_EXTRA_BYTE_MASK) == LIT_UTF8_EXTRA_BYTE_MARKER);
+ 
+   *buf_p = current_p;
++#else
++  *buf_p-= 1;
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_utf8_decr */
+ 
+ /**
+@@ -621,6 +673,7 @@ lit_utf8_string_code_unit_at (const lit_utf8_byte_t *utf8_buf_p, /**< utf-8 stri
+ inline lit_utf8_size_t JERRY_ATTR_ALWAYS_INLINE
+ lit_get_unicode_char_size_by_utf8_first_byte (const lit_utf8_byte_t first_byte) /**< buffer with characters */
+ {
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   if ((first_byte & LIT_UTF8_1_BYTE_MASK) == LIT_UTF8_1_BYTE_MARKER)
+   {
+     return 1;
+@@ -634,6 +687,10 @@ lit_get_unicode_char_size_by_utf8_first_byte (const lit_utf8_byte_t first_byte)
+     JERRY_ASSERT ((first_byte & LIT_UTF8_3_BYTE_MASK) == LIT_UTF8_3_BYTE_MARKER);
+     return 3;
+   }
++#else
++  JERRY_UNUSED (first_byte);
++  return 1;
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_get_unicode_char_size_by_utf8_first_byte */
+ 
+ /**
+@@ -646,6 +703,7 @@ lit_code_unit_to_utf8 (ecma_char_t code_unit, /**< code unit */
+                        lit_utf8_byte_t *buf_p) /**< buffer where to store the result and its size
+                                                 *   should be at least LIT_UTF8_MAX_BYTES_IN_CODE_UNIT */
+ {
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   if (code_unit <= LIT_UTF8_1_BYTE_CODE_POINT_MAX)
+   {
+     buf_p[0] = (lit_utf8_byte_t) code_unit;
+@@ -681,6 +739,10 @@ lit_code_unit_to_utf8 (ecma_char_t code_unit, /**< code unit */
+     buf_p[2] = LIT_UTF8_EXTRA_BYTE_MARKER | third_byte_bits;
+     return 3;
+   }
++#else
++  buf_p[0] = (lit_utf8_byte_t) code_unit;
++  return 1;
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_code_unit_to_utf8 */
+ 
+ /**
+@@ -693,6 +755,7 @@ lit_code_point_to_cesu8 (lit_code_point_t code_point, /**< code point */
+                          lit_utf8_byte_t *buf) /**< buffer where to store the result,
+                                                 *   its size should be at least 6 bytes */
+ {
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   if (code_point <= LIT_UTF16_CODE_UNIT_MAX)
+   {
+     return lit_code_unit_to_utf8 ((ecma_char_t) code_point, buf);
+@@ -703,6 +766,9 @@ lit_code_point_to_cesu8 (lit_code_point_t code_point, /**< code point */
+     offset += lit_code_unit_to_utf8 (convert_code_point_to_low_surrogate (code_point), buf + offset);
+     return offset;
+   }
++#else
++  return lit_code_unit_to_utf8 ((ecma_char_t) code_point, buf);
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_code_point_to_cesu8 */
+ 
+ /**
+@@ -715,6 +781,7 @@ lit_code_point_to_utf8 (lit_code_point_t code_point, /**< code point */
+                         lit_utf8_byte_t *buf) /**< buffer where to store the result,
+                                               *   its size should be at least 4 bytes */
+ {
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   if (code_point <= LIT_UTF8_1_BYTE_CODE_POINT_MAX)
+   {
+     buf[0] = (lit_utf8_byte_t) code_point;
+@@ -773,6 +840,10 @@ lit_code_point_to_utf8 (lit_code_point_t code_point, /**< code point */
+     buf[3] = LIT_UTF8_EXTRA_BYTE_MARKER | fourth_byte_bits;
+     return 4;
+   }
++#else
++  buf[0] = (lit_utf8_byte_t) code_point;
++  return 1;
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_code_point_to_utf8 */
+ 
+ /**
+@@ -788,6 +859,7 @@ lit_convert_cesu8_string_to_utf8_string (const lit_utf8_byte_t *cesu8_string, /*
+                                                                         * (can be NULL if buffer_size == 0) */
+                                          lit_utf8_size_t utf8_size) /**< size of utf-8 buffer */
+ {
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   const lit_utf8_byte_t *cesu8_pos = cesu8_string;
+   const lit_utf8_byte_t *cesu8_end_pos = cesu8_string + cesu8_size;
+ 
+@@ -828,8 +900,14 @@ lit_convert_cesu8_string_to_utf8_string (const lit_utf8_byte_t *cesu8_string, /*
+   JERRY_ASSERT (utf8_pos <= utf8_end_pos);
+ 
+   return size;
++#else
++  JERRY_UNUSED (utf8_size);
++  memcpy (utf8_string, cesu8_string, cesu8_size);
++  return cesu8_size;
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_convert_cesu8_string_to_utf8_string */
+ 
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+ /**
+  * Convert surrogate pair to code point
+  *
+@@ -852,6 +930,8 @@ lit_convert_surrogate_pair_to_code_point (ecma_char_t high_surrogate, /**< high
+   return code_point;
+ } /* lit_convert_surrogate_pair_to_code_point */
+ 
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
++
+ /**
+  * Relational compare of cesu-8 strings
+  *
+@@ -867,6 +947,7 @@ bool lit_compare_utf8_strings_relational (const lit_utf8_byte_t *string1_p, /**<
+                                           const lit_utf8_byte_t *string2_p, /**< utf-8 string */
+                                           lit_utf8_size_t string2_size) /**< string size */
+ {
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+   lit_utf8_byte_t *string1_pos = (lit_utf8_byte_t *) string1_p;
+   lit_utf8_byte_t *string2_pos = (lit_utf8_byte_t *) string2_p;
+   const lit_utf8_byte_t *string1_end_p = string1_p + string1_size;
+@@ -889,4 +970,19 @@ bool lit_compare_utf8_strings_relational (const lit_utf8_byte_t *string1_p, /**<
+   }
+ 
+   return (string1_pos >= string1_end_p && string2_pos < string2_end_p);
++#else
++  if (string1_size < string2_size)
++  {
++    return string1_size;
++  }
++  else if (string2_size < string1_size)
++  {
++    return string2_size;
++  }
++  else
++  {
++    JERRY_ASSERT (string1_size == string2_size);
++    return memcmp (string1_p, string2_p, string1_size);
++  }
++#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+ } /* lit_compare_utf8_strings_relational */
+diff --git a/jerry-core/lit/lit-strings.h b/jerry-core/lit/lit-strings.h
+index 208108b..fa5ff03 100644
+--- a/jerry-core/lit/lit-strings.h
++++ b/jerry-core/lit/lit-strings.h
+@@ -134,7 +134,9 @@ lit_utf8_size_t lit_read_prev_code_unit_from_utf8 (const lit_utf8_byte_t *buf_p,
+                                                    ecma_char_t *code_point);
+ 
+ ecma_char_t lit_utf8_read_next (const lit_utf8_byte_t **buf_p);
++#ifndef CONFIG_MICRO_PROFILE
+ ecma_char_t lit_utf8_read_prev (const lit_utf8_byte_t **buf_p);
++#endif /* !CONFIG_MICRO_PROFILE */
+ ecma_char_t lit_utf8_peek_next (const lit_utf8_byte_t *buf_p);
+ ecma_char_t lit_utf8_peek_prev (const lit_utf8_byte_t *buf_p);
+ void lit_utf8_incr (const lit_utf8_byte_t **buf_p);
+diff --git a/jerry-core/lit/lit-unicode-ranges.inc.h b/jerry-core/lit/lit-unicode-ranges.inc.h
+index fb43910..a18546e 100644
+--- a/jerry-core/lit/lit-unicode-ranges.inc.h
++++ b/jerry-core/lit/lit-unicode-ranges.inc.h
+@@ -16,6 +16,7 @@
+ /* This file is automatically generated by the gen-unicode.py script
+  * from UnicodeData-9.0.0.txt. Do not edit! */
+ 
++#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
+ /**
+  * Character interval starting points for the unicode letters.
+  *
+@@ -220,3 +221,5 @@ static const uint16_t lit_unicode_separator_chars[] JERRY_CONST_DATA =
+ {
+   0x1680, 0x180e, 0x202f, 0x205f, 0x3000
+ };
++
++#endif /* !#ifndef CONFIG_DISABLE_UTF8_CHARACTERS */
+diff --git a/jerry-core/profiles/micro.profile b/jerry-core/profiles/micro.profile
+new file mode 100644
+index 0000000..105cadd
+--- /dev/null
++++ b/jerry-core/profiles/micro.profile
+@@ -0,0 +1,12 @@
++CONFIG_DISABLE_BUILTINS
++CONFIG_DISABLE_ES2015
++CONFIG_DISABLE_UNICODE_CASE_CONVERSION
++OFF_ECMA_STRING_CONTAINER_HEAP_LONG_UTF8_STRING
++CONFIG_ECMA_LCACHE_DISABLE
++CONFIG_ECMA_PROPERTY_HASHMAP_DISABLE
++
++CONFIG_ECMA_NUMBER_TYPE=CONFIG_ECMA_NUMBER_FLOAT32
++CONFIG_REDUCE_FLOAT_STRINGIFY
++CONFIG_DISABLE_UTF8_CHARACTERS
++
++CONFIG_MICRO_PROFILE
+diff --git a/jerry-core/vm/vm.c b/jerry-core/vm/vm.c
+index b8567bd..e70c02e 100644
+--- a/jerry-core/vm/vm.c
++++ b/jerry-core/vm/vm.c
+@@ -235,6 +235,8 @@ vm_run_global (const ecma_compiled_code_t *bytecode_p) /**< pointer to bytecode
+   return ret_value;
+ } /* vm_run_global */
+ 
++#ifndef CONFIG_MICRO_PROFILE
++
+ /**
+  * Run specified eval-mode bytecode
+  *
+@@ -290,6 +292,7 @@ vm_run_eval (ecma_compiled_code_t *bytecode_data_p, /**< byte-code data */
+ 
+   return completion_value;
+ } /* vm_run_eval */
++#endif /* !CONFIG_MICRO_PROFILE */
+ 
+ /**
+  * Construct object
+@@ -2158,6 +2161,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+         }
+         case VM_OC_ADD:
+         {
++#ifndef CONFIG_MICRO_PROFILE
+           if (ecma_are_values_integer_numbers (left_value, right_value))
+           {
+             ecma_integer_value_t left_integer = ecma_get_integer_from_value (left_value);
+@@ -2187,7 +2191,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+             right_value = ECMA_VALUE_UNDEFINED;
+             break;
+           }
+-
++#endif /* !CONFIG_MICRO_PROFILE */
+           result = opfunc_addition (left_value, right_value);
+ 
+           if (ECMA_IS_VALUE_ERROR (result))
+@@ -2204,7 +2208,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+ 
+           JERRY_ASSERT (!ECMA_IS_VALUE_ERROR (left_value)
+                         && !ECMA_IS_VALUE_ERROR (right_value));
+-
++#ifndef CONFIG_MICRO_PROFILE
+           if (ecma_are_values_integer_numbers (left_value, right_value))
+           {
+             ecma_integer_value_t left_integer = ecma_get_integer_from_value (left_value);
+@@ -2234,7 +2238,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+             right_value = ECMA_VALUE_UNDEFINED;
+             break;
+           }
+-
++#endif /* !CONFIG_MICRO_PROFILE */
+           result = do_number_arithmetic (NUMBER_ARITHMETIC_SUBSTRACTION,
+                                          left_value,
+                                          right_value);
+@@ -2253,7 +2257,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+           JERRY_STATIC_ASSERT (ECMA_INTEGER_MULTIPLY_MAX * ECMA_INTEGER_MULTIPLY_MAX <= ECMA_INTEGER_NUMBER_MAX
+                                && -(ECMA_INTEGER_MULTIPLY_MAX * ECMA_INTEGER_MULTIPLY_MAX) >= ECMA_INTEGER_NUMBER_MIN,
+                                square_of_integer_multiply_max_must_fit_into_integer_value_range);
+-
++#ifndef CONFIG_MICRO_PROFILE
+           if (ecma_are_values_integer_numbers (left_value, right_value))
+           {
+             ecma_integer_value_t left_integer = ecma_get_integer_from_value (left_value);
+@@ -2296,7 +2300,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+             right_value = ECMA_VALUE_UNDEFINED;
+             break;
+           }
+-
++#endif /* !CONFIG_MICRO_PROFILE */
+           result = do_number_arithmetic (NUMBER_ARITHMETIC_MULTIPLICATION,
+                                          left_value,
+                                          right_value);
+@@ -2326,7 +2330,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+         {
+           JERRY_ASSERT (!ECMA_IS_VALUE_ERROR (left_value)
+                         && !ECMA_IS_VALUE_ERROR (right_value));
+-
++#ifndef CONFIG_MICRO_PROFILE
+           if (ecma_are_values_integer_numbers (left_value, right_value))
+           {
+             ecma_integer_value_t left_integer = ecma_get_integer_from_value (left_value);
+@@ -2343,7 +2347,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+               }
+             }
+           }
+-
++#endif /* !CONFIG_MICRO_PROFILE */
+           result = do_number_arithmetic (NUMBER_ARITHMETIC_REMAINDER,
+                                          left_value,
+                                          right_value);
+@@ -2401,12 +2405,13 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+           JERRY_STATIC_ASSERT (ECMA_DIRECT_TYPE_MASK == ((1 << ECMA_DIRECT_SHIFT) - 1),
+                                direct_type_mask_must_fill_all_bits_before_the_value_starts);
+ 
++#ifndef CONFIG_MICRO_PROFILE
+           if (ecma_are_values_integer_numbers (left_value, right_value))
+           {
+             result = left_value | right_value;
+             break;
+           }
+-
++#endif /* !CONFIG_MICRO_PROFILE */
+           result = do_number_bitwise_logic (NUMBER_BITWISE_LOGIC_OR,
+                                             left_value,
+                                             right_value);
+@@ -2422,12 +2427,13 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+           JERRY_STATIC_ASSERT (ECMA_DIRECT_TYPE_MASK == ((1 << ECMA_DIRECT_SHIFT) - 1),
+                                direct_type_mask_must_fill_all_bits_before_the_value_starts);
+ 
++#ifndef CONFIG_MICRO_PROFILE
+           if (ecma_are_values_integer_numbers (left_value, right_value))
+           {
+             result = (left_value ^ right_value) & (ecma_value_t) (~ECMA_DIRECT_TYPE_MASK);
+             break;
+           }
+-
++#endif /* !CONFIG_MICRO_PROFILE */
+           result = do_number_bitwise_logic (NUMBER_BITWISE_LOGIC_XOR,
+                                             left_value,
+                                             right_value);
+@@ -2443,12 +2449,13 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+           JERRY_STATIC_ASSERT (ECMA_DIRECT_TYPE_MASK == ((1 << ECMA_DIRECT_SHIFT) - 1),
+                                direct_type_mask_must_fill_all_bits_before_the_value_starts);
+ 
++#ifndef CONFIG_MICRO_PROFILE
+           if (ecma_are_values_integer_numbers (left_value, right_value))
+           {
+             result = left_value & right_value;
+             break;
+           }
+-
++#endif /* !CONFIG_MICRO_PROFILE */
+           result = do_number_bitwise_logic (NUMBER_BITWISE_LOGIC_AND,
+                                             left_value,
+                                             right_value);
+@@ -2464,6 +2471,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+           JERRY_STATIC_ASSERT (ECMA_DIRECT_TYPE_MASK == ((1 << ECMA_DIRECT_SHIFT) - 1),
+                                direct_type_mask_must_fill_all_bits_before_the_value_starts);
+ 
++#ifndef CONFIG_MICRO_PROFILE
+           if (ecma_are_values_integer_numbers (left_value, right_value))
+           {
+             ecma_integer_value_t left_integer = ecma_get_integer_from_value (left_value);
+@@ -2471,7 +2479,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+             result = ecma_make_int32_value ((int32_t) (left_integer << (right_integer & 0x1f)));
+             break;
+           }
+-
++#endif /* !CONFIG_MICRO_PROFILE */
+           result = do_number_bitwise_logic (NUMBER_BITWISE_SHIFT_LEFT,
+                                             left_value,
+                                             right_value);
+@@ -2486,7 +2494,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+         {
+           JERRY_STATIC_ASSERT (ECMA_DIRECT_TYPE_MASK == ((1 << ECMA_DIRECT_SHIFT) - 1),
+                                direct_type_mask_must_fill_all_bits_before_the_value_starts);
+-
++#ifndef CONFIG_MICRO_PROFILE
+           if (ecma_are_values_integer_numbers (left_value, right_value))
+           {
+             ecma_integer_value_t left_integer = ecma_get_integer_from_value (left_value);
+@@ -2494,7 +2502,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+             result = ecma_make_integer_value (left_integer >> (right_integer & 0x1f));
+             break;
+           }
+-
++#endif /* !CONFIG_MICRO_PROFILE */
+           result = do_number_bitwise_logic (NUMBER_BITWISE_SHIFT_RIGHT,
+                                             left_value,
+                                             right_value);
+@@ -2510,6 +2518,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+           JERRY_STATIC_ASSERT (ECMA_DIRECT_TYPE_MASK == ((1 << ECMA_DIRECT_SHIFT) - 1),
+                                direct_type_mask_must_fill_all_bits_before_the_value_starts);
+ 
++#ifndef CONFIG_MICRO_PROFILE
+           if (ecma_are_values_integer_numbers (left_value, right_value))
+           {
+             uint32_t left_uint32 = (uint32_t) ecma_get_integer_from_value (left_value);
+@@ -2517,7 +2526,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+             result = ecma_make_uint32_value (left_uint32 >> (right_integer & 0x1f));
+             break;
+           }
+-
++#endif /* !CONFIG_MICRO_PROFILE */
+           result = do_number_bitwise_logic (NUMBER_BITWISE_SHIFT_URIGHT,
+                                             left_value,
+                                             right_value);
+@@ -2530,6 +2539,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+         }
+         case VM_OC_LESS:
+         {
++#ifndef CONFIG_MICRO_PROFILE
+           if (ecma_are_values_integer_numbers (left_value, right_value))
+           {
+             bool is_less = (ecma_integer_value_t) left_value < (ecma_integer_value_t) right_value;
+@@ -2572,6 +2582,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+             continue;
+           }
+ 
++
+           if (ecma_is_value_number (left_value) && ecma_is_value_number (right_value))
+           {
+             ecma_number_t left_number = ecma_get_number_from_value (left_value);
+@@ -2580,7 +2591,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+             *stack_top_p++ = ecma_make_boolean_value (left_number < right_number);
+             goto free_both_values;
+           }
+-
++#endif /* !CONFIG_MICRO_PROFILE */
+           result = opfunc_relation (left_value, right_value, true, false);
+ 
+           if (ECMA_IS_VALUE_ERROR (result))
+@@ -2593,6 +2604,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+         }
+         case VM_OC_GREATER:
+         {
++#ifndef CONFIG_MICRO_PROFILE
+           if (ecma_are_values_integer_numbers (left_value, right_value))
+           {
+             ecma_integer_value_t left_integer = (ecma_integer_value_t) left_value;
+@@ -2610,7 +2622,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+             *stack_top_p++ = ecma_make_boolean_value (left_number > right_number);
+             goto free_both_values;
+           }
+-
++#endif /* !CONFIG_MICRO_PROFILE */
+           result = opfunc_relation (left_value, right_value, false, false);
+ 
+           if (ECMA_IS_VALUE_ERROR (result))
+@@ -2623,6 +2635,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+         }
+         case VM_OC_LESS_EQUAL:
+         {
++#ifndef CONFIG_MICRO_PROFILE
+           if (ecma_are_values_integer_numbers (left_value, right_value))
+           {
+             ecma_integer_value_t left_integer = (ecma_integer_value_t) left_value;
+@@ -2640,7 +2653,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+             *stack_top_p++ = ecma_make_boolean_value (left_number <= right_number);
+             goto free_both_values;
+           }
+-
++#endif /* !CONFIG_MICRO_PROFILE */
+           result = opfunc_relation (left_value, right_value, false, true);
+ 
+           if (ECMA_IS_VALUE_ERROR (result))
+@@ -2653,6 +2666,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+         }
+         case VM_OC_GREATER_EQUAL:
+         {
++#ifndef CONFIG_MICRO_PROFILE
+           if (ecma_are_values_integer_numbers (left_value, right_value))
+           {
+             ecma_integer_value_t left_integer = (ecma_integer_value_t) left_value;
+@@ -2670,7 +2684,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
+             *stack_top_p++ = ecma_make_boolean_value (left_number >= right_number);
+             goto free_both_values;
+           }
+-
++#endif /* !CONFIG_MICRO_PROFILE */
+           result = opfunc_relation (left_value, right_value, true, true);
+ 
+           if (ECMA_IS_VALUE_ERROR (result))
+diff --git a/jerry-core/vm/vm.h b/jerry-core/vm/vm.h
+index 0dc8649..8c29bfb 100644
+--- a/jerry-core/vm/vm.h
++++ b/jerry-core/vm/vm.h
+@@ -155,7 +155,9 @@ typedef enum
+   VM_OC_THROW,                   /**< throw */
+   VM_OC_THROW_REFERENCE_ERROR,   /**< throw reference error */
+ 
++#ifndef CONFIG_MICRO_PROFILE
+   VM_OC_EVAL,                    /**< eval */
++#endif /* !CONFIG_MICRO_PROFILE */
+   VM_OC_CALL,                    /**< call */
+   VM_OC_NEW,                     /**< new */
+ 
+@@ -266,6 +268,9 @@ typedef enum
+   VM_OC_PUSH_CONSTRUCTOR_THIS = VM_OC_NONE,   /**< push 'this' inside a class constructor */
+   VM_OC_CONSTRUCTOR_RET = VM_OC_NONE,         /**< explicit return from a class constructor */
+ #endif /* CONFIG_DISABLE_ES2015 */
++#ifdef CONFIG_MICRO_PROFILE
++  VM_OC_EVAL = VM_OC_NONE,                    /**< eval */
++#endif /* !CONFIG_MICRO_PROFILE */
+   VM_OC_UNUSED = VM_OC_NONE                   /**< placeholder if the list is empty */
+ } vm_oc_unused_types;
+ 
+@@ -350,7 +355,9 @@ typedef enum
+ } vm_call_operation;
+ 
+ ecma_value_t vm_run_global (const ecma_compiled_code_t *bytecode_p);
++#ifndef CONFIG_MICRO_PROFILE
+ ecma_value_t vm_run_eval (ecma_compiled_code_t *bytecode_data_p, uint32_t parse_opts);
++#endif /* !CONFIG_MICRO_PROFILE */
+ 
+ ecma_value_t vm_run (const ecma_compiled_code_t *bytecode_header_p, ecma_value_t this_binding_value,
+                      ecma_object_t *lex_env_p, uint32_t parse_opts, const ecma_value_t *arg_list_p,
+diff --git a/jerry-main/CMakeLists.txt b/jerry-main/CMakeLists.txt
+index 4b24ef5..6686659 100644
+--- a/jerry-main/CMakeLists.txt
++++ b/jerry-main/CMakeLists.txt
+@@ -55,17 +55,22 @@ macro(jerry_create_executable JERRY_NAME)
+ endmacro()
+ 
+ # Jerry standalones
+-if(JERRY_CMDLINE)
+-  jerry_create_executable("jerry" "main-unix.c" "cli.c")
+-  target_link_libraries("jerry" jerry-ext jerry-port-default)
+-endif()
++if(JERRY_CMDLINE_MICRO)
++  jerry_create_executable("jerry-micro" "main-unix-micro.c")
++  target_link_libraries("jerry-micro" jerry-port-default-minimal)
++else()
++  if(JERRY_CMDLINE)
++    jerry_create_executable("jerry" "main-unix.c" "cli.c")
++    target_link_libraries("jerry" jerry-ext jerry-port-default)
++  endif()
+ 
+-if(JERRY_CMDLINE_TEST)
+-  jerry_create_executable("jerry-test" "main-unix-test.c" "benchmarking.c")
+-  target_link_libraries("jerry-test" jerry-port-default-minimal)
+-endif()
++  if(JERRY_CMDLINE_TEST)
++    jerry_create_executable("jerry-test" "main-unix-test.c" "benchmarking.c")
++    target_link_libraries("jerry-test" jerry-port-default-minimal)
++  endif()
+ 
+-if(JERRY_CMDLINE_SNAPSHOT)
+-  jerry_create_executable("jerry-snapshot" "main-unix-snapshot.c" "cli.c")
+-  target_link_libraries("jerry-snapshot" jerry-port-default)
+-endif()
++  if(JERRY_CMDLINE_SNAPSHOT)
++    jerry_create_executable("jerry-snapshot" "main-unix-snapshot.c" "cli.c")
++    target_link_libraries("jerry-snapshot" jerry-port-default)
++  endif()
++endif ()
+diff --git a/jerry-main/main-unix-micro.c b/jerry-main/main-unix-micro.c
+new file mode 100644
+index 0000000..95680a6
+--- /dev/null
++++ b/jerry-main/main-unix-micro.c
+@@ -0,0 +1,204 @@
++/* Copyright JS Foundation and other contributors, http://js.foundation
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include <stdlib.h>
++#include <string.h>
++
++#include "jerryscript.h"
++#include "jerryscript-port.h"
++#include "jerryscript-port-default.h"
++#include "micro-source.h"
++
++void
++jerry_port_log (jerry_log_level_t level, /**< message log level */
++                const char *format, /**< format string */
++                ...)  /**< parameters */
++{
++  (void) (level);
++  (void) (format);
++} /* jerry_port_log */
++
++static jerry_value_t
++jerry_handler_register_global (const jerry_char_t *name_p, /**< name of the function */
++                               jerry_external_handler_t handler_p) /**< function callback */
++{
++  jerry_value_t global_obj_val = jerry_get_global_object ();
++  jerry_value_t function_name_val = jerry_create_string_sz (name_p, (jerry_size_t) strlen ((const char *) name_p));
++  jerry_value_t function_val = jerry_create_external_function (handler_p);
++
++  jerry_value_t result_val = jerry_set_property (global_obj_val, function_name_val, function_val);
++
++  jerry_release_value (function_val);
++  jerry_release_value (function_name_val);
++  jerry_release_value (global_obj_val);
++
++  return result_val;
++}
++
++/**
++ * Register a JavaScript function in the global object.
++ */
++static void
++register_js_function (const char *name_p, /**< name of the function */
++                      jerry_external_handler_t handler_p) /**< function callback */
++{
++  jerry_value_t result_val = jerry_handler_register_global ((const jerry_char_t *) name_p, handler_p);
++
++  if (jerry_value_is_error (result_val))
++  {
++    printf("Warning: failed to register '%s' method.", name_p);
++    result_val = jerry_get_value_from_error (result_val, true);
++  }
++
++  jerry_release_value (result_val);
++} /* register_js_function */
++
++/**
++ * Provide a 'print' implementation for scripts.
++ *
++ * The routine converts all of its arguments to strings and outputs them
++ * char-by-char using printf.
++ *
++ * The NUL character is output as "\u0000", other characters are output
++ * bytewise.
++ *
++ * @return undefined - if all arguments could be converted to strings,
++ *         error - otherwise.
++ */
++static jerry_value_t
++jerry_handler_print (const jerry_value_t func_obj_val, /**< function object */
++                     const jerry_value_t this_p, /**< this arg */
++                     const jerry_value_t args_p[], /**< function arguments */
++                     const jerry_length_t args_cnt) /**< number of function arguments */
++{
++  (void) func_obj_val; /* unused */
++  (void) this_p; /* unused */
++
++  jerry_value_t ret_val = jerry_create_undefined ();
++
++  for (jerry_length_t arg_index = 0; arg_index < args_cnt; arg_index++)
++  {
++    jerry_value_t str_val = jerry_value_to_string (args_p[arg_index]);
++
++    if (jerry_value_is_error (str_val))
++    {
++      /* There is no need to free the undefined value. */
++      ret_val = str_val;
++      break;
++    }
++
++    jerry_length_t length = jerry_get_string_length (str_val);
++    jerry_length_t substr_pos = 0;
++    jerry_char_t substr_buf[256];
++
++    do
++    {
++      jerry_size_t substr_size = jerry_substring_to_char_buffer (str_val,
++                                                                 substr_pos,
++                                                                 length,
++                                                                 substr_buf,
++                                                                 256 - 1);
++
++      jerry_char_t *buf_end_p = substr_buf + substr_size;
++      substr_pos += (jerry_length_t) (buf_end_p - substr_buf);
++
++      if (substr_pos == length)
++      {
++        *buf_end_p++ = (arg_index < args_cnt - 1) ? ' ' : '\n';
++      }
++
++      for (jerry_char_t *buf_p = substr_buf; buf_p < buf_end_p; buf_p++)
++      {
++        char chr = (char) *buf_p;
++
++        if (chr != '\0')
++        {
++          printf ("%c", chr);
++          continue;
++        }
++      }
++    }
++    while (substr_pos < length);
++
++    jerry_release_value (str_val);
++  }
++
++  if (args_cnt == 0 || jerry_value_is_error (ret_val))
++  {
++    printf ("\n");
++  }
++
++  return ret_val;
++} /* jerryx_handler_print */
++
++#ifdef MICRO_PROFILE_ASSERT
++static jerry_value_t
++jerry_handler_assert (const jerry_value_t func_obj_val, /**< function object */
++                      const jerry_value_t this_p, /**< this arg */
++                      const jerry_value_t args_p[], /**< function arguments */
++                      const jerry_length_t args_cnt) /**< number of function arguments */
++{
++  (void) func_obj_val; /* unused */
++  (void) this_p; /* unused */
++
++  if (args_cnt == 1
++      && jerry_value_is_boolean (args_p[0])
++      && jerry_get_boolean_value (args_p[0]))
++  {
++    return jerry_create_boolean (true);
++  }
++  else
++  {
++    jerry_port_log (JERRY_LOG_LEVEL_ERROR, "Script Error: assertion failed\n");
++    jerry_port_fatal (ERR_FAILED_INTERNAL_ASSERTION);
++  }
++} /* jerryx_handler_assert */
++
++#endif /* MICRO_PROFILE_ASSERT */
++
++int
++main (int argc,
++      char **argv)
++{
++  (void) argc;
++  (void) argv;
++
++  jerry_init (JERRY_INIT_EMPTY);
++
++  register_js_function ("print", jerry_handler_print);
++
++#ifdef MICRO_PROFILE_ASSERT
++  register_js_function ("assert", jerry_handler_assert);
++#endif /* MICRO_PROFILE_ASSERT */
++
++  jerry_value_t ret_value = jerry_exec_snapshot ((const uint32_t *) micro_snapshot,
++                                                 micro_snapshot_len,
++                                                 0,
++                                                 0);
++  jerry_release_value (ret_value);
++
++  int ret_code = 0;
++
++  if (jerry_value_is_error (ret_value))
++  {
++    printf ("Unhandled exception: Script Error!\n");
++    ret_code = 1;
++  }
++
++  jerry_release_value (ret_value);
++  jerry_cleanup ();
++
++  return ret_code;
++}
+diff --git a/micro_profile/doc/about_and_results.md b/micro_profile/doc/about_and_results.md
+new file mode 100644
+index 0000000..e8433cb
+--- /dev/null
++++ b/micro_profile/doc/about_and_results.md
+@@ -0,0 +1,359 @@
++# About
++
++## Binary size
++ |    Region   | Minimal profile (B)| Micro profile (B) | Difference (B) |
++ | ------------|--------------------|-------------------|----------------|
++ |     text    |      71121         |      29048        |   **-42073**   |
++ |     data    |       352          |       506         |    **+154**    |
++ |     bss     |     1071224        |       116         |  **-1071108**  |
++ | **SUMMARY** |    **142697**      |    **29670**      |  **-1113027**  |
++
++
++## Usage
++
++```
++  <assuming you are in the jerryscript directory>
++  cd micro_profile
++  ./micro.sh my_source.js
++```
++
++## Micro profile restrictions
++
++### Configuration
++ - Heap size: 20KB
++ - Link-time optimization: ON
++ - All-in-one build: ON
++ - Strip binary: ON
++ - 32-bit cpointer: ON
++ - System allocator: ON
++ - Snapshot execution: ON
++ - Floating point arithmetic: 32 bit
++ - Jerry-libm: OFF
++ - Compiler: arm-linux-gnueabihf-gcc
++ - Compile-flags: "-Os -fno-optimize-sibling-calls -fno-if-conversion -finline-limit=500"
++ - Last working commit-hash to be applied: 63e8287f2b8429d1b9f13068fe96e96aee280ce1
++
++### Disabled features
++- Builtins (Array, Boolean, Date, Function, Global, Object, Regexp, String)
++- Eval
++- Delete variable
++- Floating point number stringification
++- UTF-8 charaters (Note: Only ASCII characters are allowed, there is no run-time validation for it.)
++- Property hashmap, lcache
++
++## Results summary
++ - Test folder: tests/jerry
++ - Total tests: 305
++ - Passing tests: 85
++ - Failing tests : 220
++ - Failing tests due to profile restrictions: 220
++ - Measured commit-hash: 5472aff0dc478a1a54275cd75dbcd68058cae7fc
++
++## Detailed results
++| Test name                                             | Status | Reason                             |
++|-------------------------------------------------------|--------|------------------------------------|
++| and-or.js                                             | PASS   |                                    |
++| arguments.js                                          | FAIL   | Disabled feature: delete           |
++| arguments-parse.js                                    | FAIL   | Disabled feature: eval             |
++| arithmetic-parse.js                                   | FAIL   | Disabled feature: eval             |
++| arithmetics-2.js                                      | FAIL   | Disabled feature: eval             |
++| arithmetics-bignums.js                                | FAIL   | 32 bit floating point arithmetics  |
++| arithmetics.js                                        | FAIL   | Disabled feature: eval             |
++| array.js                                              | FAIL   | Disabled feature: Builtins         |
++| array-prototype-concat.js                             | FAIL   | Disabled builtin: Array            |
++| array-prototype-every.js                              | FAIL   | Disabled builtin: Array            |
++| array-prototype-filter.js                             | FAIL   | Disabled builtin: Array            |
++| array-prototype-foreach.js                            | FAIL   | Disabled builtin: Array            |
++| array-prototype-indexof.js                            | FAIL   | Disabled builtin: Array            |
++| array-prototype-join.js                               | FAIL   | Disabled builtin: Array            |
++| array-prototype-lastindexof.js                        | FAIL   | Disabled builtin: Array            |
++| array-prototype-map.js                                | FAIL   | Disabled builtin: Array            |
++| array-prototype-pop.js                                | FAIL   | Disabled builtin: Array            |
++| array-prototype-push.js                               | FAIL   | Disabled builtin: Array            |
++| array-prototype-reduce.js                             | FAIL   | Disabled builtin: Array            |
++| array-prototype-reduce-right.js                       | FAIL   | Disabled builtin: Array            |
++| array-prototype-reverse.js                            | FAIL   | Disabled builtin: Array            |
++| array-prototype-shift.js                              | FAIL   | Disabled builtin: Array            |
++| array-prototype-slice.js                              | FAIL   | Disabled builtin: Array            |
++| array-prototype-some.js                               | FAIL   | Disabled builtin: Array            |
++| array-prototype-sort.js                               | FAIL   | Disabled builtin: Array            |
++| array-prototype-splice.js                             | FAIL   | Disabled builtin: Array            |
++| array-prototype-tolocalestring.js                     | FAIL   | Disabled builtin: Array            |
++| array-prototype-tostring.js                           | FAIL   | Disabled builtin: Array            |
++| array-prototype-unshift.js                            | FAIL   | Disabled builtin: Array            |
++| assignments.js                                        | PASS   |                                    |
++| bitwise-logic.js                                      | PASS   |                                    |
++| break-continue-nested-to-try-with-blocks.js           | PASS   |                                    |
++| builtin-constructor-class.js                          | FAIL   | Disabled builtins                  |
++| date-annexb.js                                        | FAIL   | Disabled builtin: Date             |
++| date-construct.js                                     | FAIL   | Disabled builtin: Date             |
++| date-getters.js                                       | FAIL   | Disabled builtin: Date             |
++| date-parse.js                                         | FAIL   | Disabled builtin: Date             |
++| date-setters.js                                       | FAIL   | Disabled builtin: Date             |
++| date-tostring.js                                      | FAIL   | Disabled builtin: Date             |
++| date-utc.js                                           | FAIL   | Disabled builtin: Date             |
++| delete.js                                             | FAIL   | Disabled feature: delete           |
++| empty-varg.js                                         | PASS   |                                    |
++| equality.js                                           | PASS   |                                    |
++| error.js                                              | FAIL   | Disabled builtin: Error            |
++| escape-sequences.js                                   | FAIL   | Disabled builtin: String           |
++| eval.js                                               | FAIL   | Disabled feature: eval             |
++| for-in.js                                             | FAIL   | Disabled builtin: Object           |
++| for-in-parse.js                                       | FAIL   | Disabled feature: eval             |
++| for.js                                                | PASS   |                                    |
++| func-decl.js                                          | FAIL   | Disabled feature: eval             |
++| function-args.js                                      | FAIL   | Disabled builtin: Error            |
++| function-construct.js                                 | FAIL   | Disabled builtin: Error            |
++| function-external.js                                  | FAIL   | Disabled builtin: Error            |
++| function.js                                           | PASS   |                                    |
++| function-return.js                                    | PASS   |                                    |
++| function-prototype-apply.js                           | FAIL   | Disabled builtin: Function         |
++| function-prototype-bind.js                            | FAIL   | Disabled builtin: Function         |
++| function.prototype.js                                 | FAIL   | Disabled builtin: Function         |
++| function-prototype-tostring.js                        | FAIL   | Disabled builtin: Function         |
++| function-return.js                                    | FAIL   | Disabled builtin: Function         |
++| function-scopes.js                                    | FAIL   | Disabled builtin: Function         |
++| gc.js                                                 | FAIL   | Disabled feature: gc               |
++| getter-setter-this-value.js                           | FAIL   | Disabled builtin: Object           |
++| get-value.js                                          | FAIL   | Disabled builtin: Object           |
++| global-escaping.js                                    | FAIL   | Disabled builtin: Global           |
++| global.js                                             | FAIL   | Disabled builtin: Global           |
++| global-parsefloat.js                                  | FAIL   | Disabled builtin: Global           |
++| global-parseint.js                                    | FAIL   | Disabled builtin: Global           |
++| global-uri-coding.js                                  | FAIL   | Disabled builtin: Global           |
++| hash.js                                               | PASS   |                                    |
++| if-else.js                                            | PASS   |                                    |
++| if_parser.js                                          | FAIL   | Disabled feature: eval             |
++| insert-semicolon.js                                   | FAIL   | Disabled builtin: Function         |
++| json-parse.js                                         | FAIL   | Disabled builtin: JSON             |
++| json-stringify.js                                     | FAIL   | Disabled builtin: JSON             |
++| labelled-statements.js                                | PASS   |                                    |
++| logical.js                                            | PASS   |                                    |
++| math-abs.js                                           | FAIL   | Disabled builtin: Math             |
++| math-exp.js                                           | FAIL   | Disabled builtin: Math             |
++| math-log.js                                           | FAIL   | Disabled builtin: Math             |
++| math-max.js                                           | FAIL   | Disabled builtin: Math             |
++| math-min.js                                           | FAIL   | Disabled builtin: Math             |
++| math-pow.js                                           | FAIL   | Disabled builtin: Math             |
++| math-round.js                                         | FAIL   | Disabled builtin: Math             |
++| math-trig.js                                          | FAIL   | Disabled builtin: Math             |
++| N.compact-profile-error.js                            | FAIL   | Disabled feature: eval             |
++| nested-function.js                                    | PASS   |                                    |
++| new-line-in-literal.js                                | FAIL   | Disabled feature: eval             |
++| number-prototype-to-exponential.js                    | FAIL   | Disabled builtin: Number           |
++| number-prototype-to-fixed.js                          | FAIL   | Disabled builtin: Number           |
++| number-prototype-to-precision.js                      | FAIL   | Disabled builtin: Number           |
++| number-prototype-to-string.js                         | FAIL   | Disabled builtin: Number           |
++| object-create.js                                      | FAIL   | Disabled builtin: Object           |
++| object-define-properties.js                           | FAIL   | Disabled builtin: Object           |
++| object-defineproperty.js                              | FAIL   | Disabled builtin: Object           |
++| object_freeze.js                                      | FAIL   | Disabled builtin: Object           |
++| object-get-own-property-descriptor.js                 | FAIL   | Disabled builtin: Object           |
++| object-get-own-property-names.js                      | FAIL   | Disabled builtin: Object           |
++| object-is-extensible.js                               | FAIL   | Disabled builtin: Object           |
++| object-keys.js                                        | FAIL   | Disabled builtin: Object           |
++| object-literal-2.js                                   | FAIL   | Disabled feature: eval             |
++| object-literal.js                                     | FAIL   | Disabled builtin: Object           |
++| object-prototype-hasownproperty.js                    | FAIL   | Disabled builtin: Object           |
++| object-prototype-isprototypeof.js                     | FAIL   | Disabled builtin: Object           |
++| object-prototype-propertyisenumerable.js              | FAIL   | Disabled builtin: Object           |
++| object-prototype-tolocalestring.js                    | FAIL   | Disabled builtin: Object           |
++| object_seal.js                                        | FAIL   | Disabled builtin: Object           |
++| octal.js                                              | PASS   |                                    |
++| parser-oom.js                                         | FAIL   | Disabled feature: eval             |
++| regexp-alternatives.js                                | FAIL   | Disabled builtin: Regexp           |
++| regexp-assertions.js                                  | FAIL   | Disabled builtin: Regexp           |
++| regexp-backreference.js                               | FAIL   | Disabled builtin: Regexp           |
++| regexp-capture-groups.js                              | FAIL   | Disabled builtin: Regexp           |
++| regexp-character-class.js                             | FAIL   | Disabled builtin: Regexp           |
++| regexp-construct.js                                   | FAIL   | Disabled builtin: Regexp           |
++| regexp-literal.js                                     | FAIL   | Disabled builtin: Regexp           |
++| regexp-non-capture-groups.js                          | FAIL   | Disabled builtin: Regexp           |
++| regexp-routines.js                                    | FAIL   | Disabled builtin: Regexp           |
++| regexp-simple-atom-and-iterations.js                  | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-1054.js                         | FAIL   | Disabled builtin: Number           |
++| regression-test-issue-1065.js                         | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-1071.js                         | FAIL   | Disabled builtin: Date             |
++| regression-test-issue-1072.js                         | PASS   |                                    |
++| regression-test-issue-1073.js                         | PASS   |                                    |
++| regression-test-issue-1074.js                         | PASS   |                                    |
++| regression-test-issue-1075.js                         | PASS   |                                    |
++| regression-test-issue-1076.js                         | PASS   |                                    |
++| regression-test-issue-1078.js                         | FAIL   | Disabled builtin: Array            |
++| regression-test-issue-1079.js                         | FAIL   | Disabled builtin: Array            |
++| regression-test-issue-1080.js                         | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-1081.js                         | PASS   |                                    |
++| regression-test-issue-1082.js                         | PASS   |                                    |
++| regression-test-issue-1083.js                         | PASS   |                                    |
++| regression-test-issue-112.js                          | FAIL   | Disabled feature: delete           |
++| regression-test-issue-113.js                          | FAIL   | Disabled feature: float stringify  |
++| regression-test-issue-114.js                          | PASS   |                                    |
++| regression-test-issue-115.js                          | FAIL   | Disabled builtin: Object           |
++| regression-test-issue-116.js                          | FAIL   | Disabled builtin: Error            |
++| regression-test-issue-117.js                          | PASS   |                                    |
++| regression-test-issue-121.js                          | FAIL   | Disabled builtin: Object           |
++| regression-test-issue-122.js                          | FAIL   | Disabled builtin: Object           |
++| regression-test-issue-123.js                          | PASS   |                                    |
++| regression-test-issue-1282.js                         | PASS   |                                    |
++| regression-test-issue-1284.js                         | PASS   |                                    |
++| regression-test-issue-1286.js                         | FAIL   | Disabled feature: eval             |
++| regression-test-issue-128.js                          | PASS   |                                    |
++| regression-test-issue-1292.js                         | FAIL   | Disabled builtin: Error            |
++| regression-test-issue-129.js                          | FAIL   | Disabled feature: eval             |
++| regression-test-issue-1300.js                         | PASS   |                                    |
++| regression-test-issue-1309.js                         | FAIL   | Disabled builtin: Error            |
++| regression-test-issue-130.js                          | FAIL   | Disabled builtin: Math             |
++| regression-test-issue-132.js                          | FAIL   | Disabled builtin: Object           |
++| regression-test-issue-1386.js                         | FAIL   | Disabled builtin: Date             |
++| regression-test-issue-1387.js                         | PASS   |                                    |
++| regression-test-issue-1389.js                         | PASS   |                                    |
++| regression-test-issue-1533.js                         | PASS   |                                    |
++| regression-test-issue-1546.js                         | FAIL   | Disabled builtin: String           |
++| regression-test-issue-1547.js                         | FAIL   | Disabled builtin: Date             |
++| regression-test-issue-1552.js                         | PASS   |                                    |
++| regression-test-issue-1555.js                         | FAIL   | Disabled feature: eval             |
++| regression-test-issue-1556.js                         | FAIL   | Disabled feature: eval             |
++| regression-test-issue-156.js                          | PASS   |                                    |
++| regression-test-issue-1621.js                         | FAIL   | Disabled feature: eval             |
++| regression-test-issue-1636.js                         | FAIL   | Disabled builtin: Math             |
++| regression-test-issue-1641.js                         | FAIL   | Disabled builtin: String           |
++| regression-test-issue-164.js                          | PASS   |                                    |
++| regression-test-issue-1657.js                         | FAIL   | Disabled builtin: Date             |
++| regression-test-issue-1829.js                         | PASS   |                                    |
++| regression-test-issue-1830.js                         | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-1833.js                         | PASS   |                                    |
++| regression-test-issue-1855.js                         | PASS   |                                    |
++| regression-test-issue-1917.js                         | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-1934.js                         | FAIL   | Disabled builtin: Array            |
++| regression-test-issue-1947.js                         | PASS   |                                    |
++| regression-test-issue-195.js                          | PASS   |                                    |
++| regression-test-issue-1970.js                         | FAIL   | Disabled builtin: Function         |
++| regression-test-issue-1972.js                         | FAIL   | Disabled builtin: Array            |
++| regression-test-issue-1973.js                         | PASS   |                                    |
++| regression-test-issue-1974.js                         | FAIL   | Disabled builtin: Number           |
++| regression-test-issue-1990.js                         | FAIL   | Disabled builtin: Global           |
++| regression-test-issue-1993.js                         | FAIL   | Disabled builtin: Global           |
++| regression-test-issue-2008.js                         | PASS   |                                    |
++| regression-test-issue-2073.js                         | FAIL   | Disabled builtin: Date             |
++| regression-test-issue-2105.js                         | FAIL   | Disabled builtin: Object           |
++| regression-test-issue-2108.js                         | FAIL   | Disabled builtin: Number           |
++| regression-test-issue-212.js                          | FAIL   | Disabled feature: eval             |
++| regression-test-issue-2178.js                         | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-2182.js                         | FAIL   | Disabled builtin: Function         |
++| regression-test-issue-2198.js                         | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-2200.js                         | FAIL   | Disabled builtin: JSON             |
++| regression-test-issue-2204.js                         | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-2230.js                         | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-2237.js                         | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-2272.js                         | FAIL   | Disabled builtin: Math             |
++| regression-test-issue-2384.js                         | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-2386.js                         | FAIL   | Disabled builtin: Number           |
++| regression-test-issue-2398.js                         | PASS   |                                    |
++| regression-test-issue-2400.js                         | PASS   |                                    |
++| regression-test-issue-2409.js                         | FAIL   | Disabled feature: eval             |
++| regression-test-issue-2451.js                         | FAIL   | Disabled feature: UTF-8 characters |
++| regression-test-issue-2452.js                         | FAIL   | Disabled feature: UTF-8 characters |
++| regression-test-issue-2453.js                         | FAIL   | Disabled feature: UTF-8 characters |
++| regression-test-issue-245.js                          | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-2478.js                         | FAIL   | Disabled builtin: Function         |
++| regression-test-issue-255.js                          | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-257.js                          | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-260.js                          | PASS   |                                    |
++| regression-test-issue-261.js                          | PASS   |                                    |
++| regression-test-issue-262.js                          | PASS   |                                    |
++| regression-test-issue-263.js                          | PASS   |                                    |
++| regression-test-issue-264.js                          | PASS   |                                    |
++| regression-test-issue-265.js                          | FAIL   | Disabled builtin: Global           |
++| regression-test-issue-266.js                          | PASS   |                                    |
++| regression-test-issue-267.js                          | PASS   |                                    |
++| regression-test-issue-274.js                          | PASS   |                                    |
++| regression-test-issue-276.js                          | PASS   |                                    |
++| regression-test-issue-279.js                          | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-280.js                          | FAIL   | Disabled feature: eval             |
++| regression-test-issue-281.js                          | PASS   |                                    |
++| regression-test-issue-285.js                          | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-312.js                          | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-316.js                          | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-339.js                          | FAIL   | Disabled feature: eval             |
++| regression-test-issue-340.js                          | PASS   |                                    |
++| regression-test-issue-341.js                          | FAIL   | Disabled feature: eval             |
++| regression-test-issue-354.js                          | PASS   |                                    |
++| regression-test-issue-359.js                          | PASS   |                                    |
++| regression-test-issue-380.js                          | FAIL   | Disabled feature: UTF-8 characters |
++| regression-test-issue-381.js                          | PASS   |                                    |
++| regression-test-issue-429.js                          | PASS   |                                    |
++| regression-test-issue-440.js                          | PASS   |                                    |
++| regression-test-issue-447.js                          | FAIL   | Disabled builtin: Error            |
++| regression-test-issue-453.js                          | PASS   |                                    |
++| regression-test-issue-541.js                          | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-563.js                          | FAIL   | Disabled feature: eval             |
++| regression-test-issue-566.js                          | FAIL   | Disabled builtin: Date             |
++| regression-test-issue-612.js                          | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-613.js                          | PASS   |                                    |
++| regression-test-issue-614.js                          | FAIL   | Disabled builtin: JSON             |
++| regression-test-issue-639.js                          | PASS   |                                    |
++| regression-test-issue-640.js                          | PASS   |                                    |
++| regression-test-issue-641.js                          | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-642.js                          | FAIL   | Disabled builtin: Function         |
++| regression-test-issue-644.js                          | PASS   |                                    |
++| regression-test-issue-646.js                          | PASS   |                                    |
++| regression-test-issue-652.js                          | FAIL   | Disabled feature: eval             |
++| regression-test-issue-653.js                          | PASS   |                                    |
++| regression-test-issue-654.js                          | PASS   |                                    |
++| regression-test-issue-655.js                          | FAIL   | Disabled feature: eval             |
++| regression-test-issue-667.js                          | PASS   |                                    |
++| regression-test-issue-669.js                          | PASS   |                                    |
++| regression-test-issue-680.js                          | FAIL   | Disabled builtin: Error            |
++| regression-test-issue-686.js                          | FAIL   | Disabled feature: eval             |
++| regression-test-issue-689.js                          | PASS   |                                    |
++| regression-test-issue-703.js                          | PASS   |                                    |
++| regression-test-issue-725.js                          | FAIL   | Disabled feature: eval             |
++| regression-test-issue-736.js                          | FAIL   | Disabled feature: eval             |
++| regression-test-issue-737.js                          | FAIL   | Disabled feature: eval             |
++| regression-test-issue-738.js                          | FAIL   | Disabled builtin: Boolean          |
++| regression-test-issue-739.js                          | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-741.js                          | FAIL   | Disabled builtin: JSON             |
++| regression-test-issue-743.js                          | PASS   |                                    |
++| regression-test-issue-745.js                          | FAIL   | Disabled feature: eval             |
++| regression-test-issue-747.js                          | FAIL   | Disabled builtin: String           |
++| regression-test-issue-781.js                          | FAIL   | Disabled builtin: Function         |
++| regression-test-issue-782.js                          | FAIL   | Disabled builtin: String           |
++| regression-test-issue-783.js                          | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issue-785.js                          | PASS   |                                    |
++| regression-test-issue-786.js                          | PASS   |                                    |
++| regression-test-issue-787.js                          | FAIL   | Disabled builtin: Array            |
++| regression-test-issue-798.js                          | PASS   |                                    |
++| regression-test-issue-962.js                          | FAIL   | Disabled builtin: Regexp           |
++| regression-test-issues-43-183.js                      | FAIL   | Disabled feature: eval             |
++| relational.js                                         | FAIL   | Disabled feature: float stringify  |
++| shift.js                                              | PASS   |                                    |
++| sqrt.js                                               | FAIL   | Disabled builtin: Math             |
++| strict.js                                             | FAIL   | Disabled builtin: Error            |
++| string.js                                             | PASS   |                                    |
++| string-prototype-charat.js                            | FAIL   | Disabled builtin: String           |
++| string-prototype-charcodeat.js                        | FAIL   | Disabled builtin: String           |
++| string-prototype-concat.js                            | FAIL   | Disabled builtin: String           |
++| string-prototype-indexof.js                           | FAIL   | Disabled builtin: String           |
++| string-prototype.js                                   | FAIL   | Disabled builtin: String           |
++| string-prototype-lastindexof.js                       | FAIL   | Disabled builtin: String           |
++| string-prototype-localecompare.js                     | FAIL   | Disabled builtin: String           |
++| string-prototype-match.js                             | FAIL   | Disabled builtin: String           |
++| string-prototype-replace.js                           | FAIL   | Disabled builtin: String           |
++| string-prototype-search.js                            | FAIL   | Disabled builtin: String           |
++| string-prototype-slice.js                             | FAIL   | Disabled builtin: String           |
++| string-prototype-split.js                             | FAIL   | Disabled builtin: String           |
++| string-prototype-substring.js                         | FAIL   | Disabled builtin: String           |
++| string-prototype-substr.js                            | FAIL   | Disabled builtin: String           |
++| string-prototype-trim.js                              | FAIL   | Disabled builtin: String           |
++| string-surrogates-concat.js                           | FAIL   | Disabled feature: UTF-8 characters |
++| string-upper-lower-case-conversion.js                 | FAIL   | Disabled feature: UTF-8 characters |
++| switch-case.js                                        | PASS   |                                    |
++| test-new-string.js                                    | FAIL   | Disabled builtin: String           |
++| this-arg.js                                           | PASS   |                                    |
++| try-catch-finally.js                                  | PASS   |                                    |
++| typeof.js                                             | PASS   |                                    |
++| unary-plus-minus.js                                   | FAIL   | Disabled builtin: Global           |
++| var-decl.js                                           | FAIL   | Disabled feature: eval             |
++| variables.js                                          | PASS   |                                    |
++| windows-line-ending.js                                | PASS   |                                    |
++| zero-character.js                                     | FAIL   | Disabled feature: eval             |
+diff --git a/micro_profile/doc/function_sizes.md b/micro_profile/doc/function_sizes.md
+new file mode 100644
+index 0000000..18d8190
+--- /dev/null
++++ b/micro_profile/doc/function_sizes.md
+@@ -0,0 +1,195 @@
++# Detailed function sizes
++
++## Text section
++
++| Function name                                              | Size (B) |
++|------------------------------------------------------------|----------|
++| vm_loop                                                    | 7304     |
++| vm_execute                                                 | 1022     |
++| ecma_op_function_call                                      | 806      |
++| ecma_string_to_number                                      | 748      |
++| ecma_append_chars_to_string                                | 640      |
++| main                                                       | 616      |
++| __udivsi3                                                  | 604      |
++| ecma_op_general_object_define_own_property                 | 548      |
++| ecma_op_array_object_set_length                            | 530      |
++| ecma_op_object_put                                         | 522      |
++| ecma_gc_run                                                | 520      |
++| ecma_op_object_get_own_property                            | 464      |
++| ecma_builtin_try_to_instantiate_property                   | 432      |
++| opfunc_relation                                            | 430      |
++| ecma_op_object_find_own                                    | 410      |
++| ecma_op_same_value                                         | 382      |
++| ecma_snapshot_get_literal                                  | 380      |
++| ecma_op_object_define_own_property                         | 370      |
++| ecma_op_abstract_equality_compare                          | 358      |
++| jerry_handler_print                                        | 346      |
++| ecma_builtin_function_dispatch_construct                   | 338      |
++| snapshot_load_compiled_code                                | 338      |
++| ecma_new_ecma_string_from_utf8                             | 304      |
++| ecma_string_get_chars                                      | 294      |
++| ecma_op_function_construct                                 | 276      |
++| do_number_arithmetic                                       | 240      |
++| vm_stack_find_finally                                      | 238      |
++| ecma_find_named_property                                   | 206      |
++| ecma_op_strict_equality_compare                            | 202      |
++| ecma_create_property                                       | 190      |
++| do_number_bitwise_logic                                    | 184      |
++| ecma_instantiate_builtin_helper                            | 182      |
++| ecma_gc_mark                                               | 180      |
++| ecma_op_to_object                                          | 178      |
++| ecma_concat_ecma_strings                                   | 168      |
++| ecma_number_to_uint32                                      | 168      |
++| ecma_op_general_object_default_value                       | 158      |
++| ecma_op_bound_function_try_to_lazy_instantiate_property    | 156      |
++| ecma_op_to_string                                          | 156      |
++| ecma_op_function_try_to_lazy_instantiate_property          | 152      |
++| ecma_string_get_length                                     | 152      |
++| vm_stack_context_abort                                     | 148      |
++| ecma_get_number                                            | 144      |
++| ecma_op_to_number                                          | 132      |
++| vm_run                                                     | 124      |
++| ecma_builtin_make_function_object_for_routine              | 120      |
++| ecma_string_to_array_index                                 | 120      |
++| ecma_delete_property                                       | 118      |
++| ecma_instantiate_builtin                                   | 102      |
++| ecma_append_to_values_collection                           | 100      |
++| ecma_op_to_boolean                                         | 98       |
++| ecma_make_number_value                                     | 94       |
++| ecma_new_ecma_string_from_number                           | 94       |
++| ecma_number_trunc                                          | 90       |
++| ecma_bytecode_deref                                        | 82       |
++| ecma_op_create_function_object                             | 78       |
++| ecma_gc_mark_property                                      | 76       |
++| jmem_heap_gc_and_alloc_block                               | 72       |
++| ecma_create_named_accessor_property                        | 70       |
++| ecma_op_resolve_reference_value                            | 70       |
++| ecma_value_assign_value                                    | 70       |
++| ecma_uint32_to_utf8_string                                 | 66       |
++| ecma_deref_ecma_string                                     | 64       |
++| ecma_op_create_mutable_binding                             | 64       |
++| ecma_op_set_mutable_binding                                | 64       |
++| ecma_free_property                                         | 62       |
++| ecma_copy_value                                            | 60       |
++| ecma_create_object                                         | 60       |
++| ecma_free_value                                            | 60       |
++| ecma_string_get_char_at_pos                                | 60       |
++| __libc_csu_init                                            | 60       |
++| ecma_op_put_value_lex_env_base                             | 58       |
++| ecma_new_ecma_string_from_magic_string_ex_id               | 56       |
++| ecma_op_get_binding_value                                  | 56       |
++| ecma_create_error_reference_from_context                   | 52       |
++| ecma_new_ecma_string_from_uint32                           | 52       |
++| jerry_release_value                                        | 52       |
++| ecma_free_values_collection                                | 50       |
++| ecma_op_object_get_property                                | 50       |
++| ecma_create_decl_lex_env                                   | 48       |
++| ecma_create_object_lex_env                                 | 48       |
++| ecma_free_string_list                                      | 48       |
++| jmem_pools_collect_empty                                   | 48       |
++| ecma_builtin_helper_def_prop                               | 42       |
++| ecma_op_object_get                                         | 40       |
++| ecma_op_object_find                                        | 38       |
++| ecma_init_gc_info                                          | 36       |
++| ecma_make_uint32_value                                     | 36       |
++| ecma_string_get_property_index                             | 36       |
++| vm_var_decl                                                | 36       |
++| ecma_builtin_get                                           | 34       |
++| ecma_new_values_collection                                 | 34       |
++| ecma_op_external_function_try_to_lazy_instantiate_property | 34       |
++| ecma_op_has_binding                                        | 34       |
++| ecma_compare_ecma_strings_longpath                         | 30       |
++| ecma_new_standard_error                                    | 30       |
++| ecma_raise_standard_error                                  | 30       |
++| ecma_ref_ecma_string                                       | 30       |
++| ecma_alloc_number                                          | 28       |
++| ecma_free_unused_memory                                    | 28       |
++| ecma_op_is_callable                                        | 28       |
++| vm_decode_branch_offset                                    | 28       |
++| __aeabi_uidivmod                                           | 26       |
++| ecma_get_number_from_value                                 | 26       |
++| ecma_number_is_infinity                                    | 26       |
++| ecma_op_resolve_reference_base                             | 26       |
++| ecma_op_to_primitive                                       | 26       |
++| __aeabi_llsl                                               | 24       |
++| __ashldi3                                                  | 24       |
++| ecma_ref_object                                            | 24       |
++| vm_construct_literal_object                                | 24       |
++| ecma_collection_iterator_next                              | 20       |
++| ecma_create_named_data_property                            | 20       |
++| ecma_string_get_chars_fast                                 | 20       |
++| jmem_run_free_unused_memory_callbacks                      | 20       |
++| ecma_copy_value_if_not_object                              | 18       |
++| ecma_free_value_if_not_object                              | 16       |
++| lit_get_magic_string_ex_size                               | 16       |
++| lit_get_magic_string_ex_utf8                               | 16       |
++| ecma_builtin_error_dispatch_construct                      | 14       |
++| ecma_collection_iterator_init                              | 14       |
++| ecma_gc_set_object_visited                                 | 14       |
++| ecma_reject                                                | 14       |
++| __aeabi_idiv0                                              | 12       |
++| __aeabi_ldiv0                                              | 12       |
++| ecma_builtin_function_prototype_dispatch_construct         | 10       |
++| ecma_builtin_type_error_thrower_dispatch_construct         | 10       |
++| ecma_op_check_object_coercible                             | 10       |
++| ecma_op_function_construct                                 | 10       |
++| ecma_op_object_has_instance                                | 10       |
++| ecma_op_set_mutable_binding                                | 10       |
++| ecma_op_to_object                                          | 10       |
++| ecma_reject                                                | 10       |
++| jerry_snapshot_result                                      | 10       |
++| opfunc_in                                                  | 10       |
++| ecma_get_named_accessor_property_setter                    | 6        |
++| ecma_builtin_object_dispatch_construct                     | 4        |
++
++## Data section
++
++| Data name                                                | Size (B) |
++|----------------------------------------------------------|----------|
++| ecma_builtin_object_prototype_property_descriptor_list   | 12       |
++| ecma_builtin_type_error_thrower_property_descriptor_list | 12       |
++| ecma_builtin_error_property_descriptor_list              | 18       |
++| ecma_builtin_function_property_descriptor_list           | 18       |
++| ecma_builtin_function_prototype_property_descriptor_list | 18       |
++| ecma_builtin_object_property_descriptor_list             | 18       |
++| ecma_builtin_construct_functions                         | 20       |
++| ecma_builtin_error_prototype_property_descriptor_list    | 30       |
++| ecma_builtin_property_list_references                    | 32       |
++| builtin_number_list                                      | 40       |
++| ecma_builtin_global_property_descriptor_list             | 42       |
++| lit_magic_string_sizes                                   | 47       |
++| lit_magic_string_size_block_starts                       | 64       |
++| lit_magic_strings                                        | 188      |
++| vm_decode_table                                          | 644      |
++
++
++## Section sizes
++| section              | size  |  addr  |
++|---------------------------------------|
++| .interp              |   25  |  65876 |
++| .note.ABI-tag        |   32  |  65904 |
++| .note.gnu.build-id   |   36  |  65936 |
++| .gnu.hash            |   96  |  65972 |
++| .dynsym              |  240  |  66068 |
++| .dynstr              |  145  |  66308 |
++| .gnu.version         |   30  |  66454 |
++| .gnu.version_r       |   32  |  66484 |
++| .rel.dyn             |    8  |  66516 |
++| .rel.plt             |  112  |  66524 |
++| .init                |   12  |  66636 |
++| .plt                 |  188  |  66648 |
++| .text                | 26460 |  66840 |
++| .fini                |    8  |  93300 |
++| .rodata              | 1612  |  93308 |
++| .ARM.exidx           |    8  |  94920 |
++| .eh_frame            |    4  |  94928 |
++| .init_array          |    4  | 163596 |
++| .fini_array          |    4  | 163600 |
++| .jcr                 |    4  | 163604 |
++| .dynamic             |  232  | 163608 |
++| .got                 |   72  | 163840 |
++| .data                |  190  | 163912 |
++| .bss                 |  116  | 164104 |
++| .comment             |   59  |      0 |
++| .ARM.attributes      |   51  |      0 |
++| Total                | 29780 |    -   |
+diff --git a/micro_profile/micro.sh b/micro_profile/micro.sh
+new file mode 100755
+index 0000000..8f68fce
+--- /dev/null
++++ b/micro_profile/micro.sh
+@@ -0,0 +1,73 @@
++#!/bin/bash
++
++TEST=0
++
++if [ "$#" -ne 1 ]; then
++  if [ "$#" -eq 2 ] && [ $2 = "-t" ]; then
++    TEST=1
++  else
++    echo "Usage: micro.sh my_source.js [-t]"
++    exit
++  fi
++fi
++
++SNAPSHOT_FILE="./micro.snapshot"
++HEADER_NAME="./include/micro-source.h"
++INCLUDE_PATH=`realpath ./include`
++
++#1st, build the engine for with the snapshot tool
++COM_SNAPSHOT="../tools/build.py"
++COM_SNAPSHOT=$COM_SNAPSHOT" --clean"
++COM_SNAPSHOT=$COM_SNAPSHOT" --cpointer-32bit=ON"
++COM_SNAPSHOT=$COM_SNAPSHOT" --jerry-cmdline=ON"
++COM_SNAPSHOT=$COM_SNAPSHOT" --jerry-cmdline-snapshot=ON"
++COM_SNAPSHOT=$COM_SNAPSHOT" --cmake-param=-DCONFIG_REDUCE_FLOAT_STRINGIFY=1"
++$COM_SNAPSHOT
++
++#2nd, generate the snapshot file from the given source
++COM_RUN="../build/bin/jerry-snapshot generate -o "$SNAPSHOT_FILE" "$1
++$COM_RUN
++
++#3rd step, create a header from the source with header guard
++COM_GEN="xxd -i "$(basename "$SNAPSHOT_FILE")" "$HEADER_NAME
++`$COM_GEN`
++
++sed -i '1s/^/#ifndef MICRO_PROFILE_SOURCE_H\n#define MICRO_PROFILE_SOURCE_H\n\n/' $HEADER_NAME
++echo -e '\n#endif /* MICRO_PROFILE_SOURCE_H */' >> $HEADER_NAME
++
++#4th step, build the engine with micro profile options
++COM_MICRO="../tools/build.py"
++
++#feature configuration
++COM_MICRO=$COM_MICRO" --clean"
++COM_MICRO=$COM_MICRO" --jerry-cmdline=ON"
++COM_MICRO=$COM_MICRO" --jerry-cmdline-snapshot=ON"
++COM_MICRO=$COM_MICRO" --jerry-debugger=OFF"
++COM_MICRO=$COM_MICRO" --jerry-libm=OFF"
++COM_MICRO=$COM_MICRO" --jerry-ext=OFF"
++COM_MICRO=$COM_MICRO" --snapshot-exec=ON"
++COM_MICRO=$COM_MICRO" --snapshot-save=OFF"
++COM_MICRO=$COM_MICRO" --jerry-port-default=OFF"
++COM_MICRO=$COM_MICRO" --jerry-cmdline-test=OFF"
++COM_MICRO=$COM_MICRO" --js-parser=OFF"
++COM_MICRO=$COM_MICRO" --profile=micro"
++COM_MICRO=$COM_MICRO" --cmake-param=-DJERRY_CMDLINE_MICRO=ON"
++
++#compiler/binary size relevant configuration
++if [ $TEST -eq 0 ]; then
++  COM_MICRO=$COM_MICRO" --toolchain=cmake/toolchain_linux_armv7l.cmake"
++else
++  COM_MICRO=$COM_MICRO" --compile-flag=-m32"
++fi
++COM_MICRO=$COM_MICRO" --compile-flag=-finline-limit=500"
++COM_MICRO=$COM_MICRO" --compile-flag=-fno-optimize-sibling-calls"
++COM_MICRO=$COM_MICRO" --compile-flag=-fno-if-conversion"
++COM_MICRO=$COM_MICRO" --compile-flag=-I"$INCLUDE_PATH
++COM_MICRO=$COM_MICRO" --system-allocator=ON"
++COM_MICRO=$COM_MICRO" --mem-heap=20"
++COM_MICRO=$COM_MICRO" --cpointer-32bit=ON"
++COM_MICRO=$COM_MICRO" --all-in-one=ON"
++COM_MICRO=$COM_MICRO" --lto=ON"
++COM_MICRO=$COM_MICRO" --strip=ON"
++COM_MICRO=$COM_MICRO" --link-map=ON"
++$COM_MICRO
+diff --git a/micro_profile/test_micro.sh b/micro_profile/test_micro.sh
+new file mode 100755
+index 0000000..806cd4d
+--- /dev/null
++++ b/micro_profile/test_micro.sh
+@@ -0,0 +1,36 @@
++TESTS_DIR="../tests/jerry"
++RESULT_FILE="test_result.txt"
++SNAPSHOT_FILE="./micro.snapshot"
++HEADER_NAME="./include/micro-source.h"
++INCLUDE_PATH=`realpath ./include`
++
++COM_RUN="../build/bin/jerry-micro"
++
++PASS=0
++FAIL=0
++SUM=0
++
++rm -f $RESULT_FILE
++touch $RESULT_FILE
++
++#3rd run all the related tests
++for entry in "$TESTS_DIR"/*
++do
++  ./micro.sh $entry -t
++  $COM_RUN
++
++  if [ $? -eq 0 ] ; then
++    echo "PASS: "$entry >> test_rate.txt
++    PASS=$((PASS+1))
++  else
++    FAIL=$((FAIL+1))
++    echo "FAIL: "$entry >> test_rate.txt
++  fi
++
++  SUM=$((SUM+1))
++done
++
++echo "****************************"
++echo "PASS: "$PASS
++echo "FAIL: "$FAIL
++echo "SUM: "$SUM
+diff --git a/tools/gen-magic-strings.py b/tools/gen-magic-strings.py
+index 9c22b5f..4eddd39 100755
+--- a/tools/gen-magic-strings.py
++++ b/tools/gen-magic-strings.py
+@@ -133,7 +133,8 @@ def extract_magic_string_refs(debug=False):
+                 guards = guard_stack[-1]
+                 guards[-1] = '!(%s)' % guards[-1]
+             elif endif_match is not None:
+-                guard_stack.pop()
++                if guard_stack:
++                    guard_stack.pop()
+ 
+             lnum = fileinput.filelineno()
+             process_line(fname, lnum, line, guard_stack)

@@ -155,7 +155,9 @@ typedef enum
   VM_OC_THROW,                   /**< throw */
   VM_OC_THROW_REFERENCE_ERROR,   /**< throw reference error */
 
+#ifndef CONFIG_MICRO_PROFILE
   VM_OC_EVAL,                    /**< eval */
+#endif /* !CONFIG_MICRO_PROFILE */
   VM_OC_CALL,                    /**< call */
   VM_OC_NEW,                     /**< new */
 
@@ -266,6 +268,9 @@ typedef enum
   VM_OC_PUSH_CONSTRUCTOR_THIS = VM_OC_NONE,   /**< push 'this' inside a class constructor */
   VM_OC_CONSTRUCTOR_RET = VM_OC_NONE,         /**< explicit return from a class constructor */
 #endif /* CONFIG_DISABLE_ES2015 */
+#ifdef CONFIG_MICRO_PROFILE
+  VM_OC_EVAL = VM_OC_NONE,                    /**< eval */
+#endif /* !CONFIG_MICRO_PROFILE */
   VM_OC_UNUSED = VM_OC_NONE                   /**< placeholder if the list is empty */
 } vm_oc_unused_types;
 
@@ -350,7 +355,9 @@ typedef enum
 } vm_call_operation;
 
 ecma_value_t vm_run_global (const ecma_compiled_code_t *bytecode_p);
+#ifndef CONFIG_MICRO_PROFILE
 ecma_value_t vm_run_eval (ecma_compiled_code_t *bytecode_data_p, uint32_t parse_opts);
+#endif /* !CONFIG_MICRO_PROFILE */
 
 ecma_value_t vm_run (const ecma_compiled_code_t *bytecode_header_p, ecma_value_t this_binding_value,
                      ecma_object_t *lex_env_p, uint32_t parse_opts, const ecma_value_t *arg_list_p,

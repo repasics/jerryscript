@@ -270,6 +270,7 @@ jerry_register_magic_strings (const jerry_char_t * const *ex_str_items_p, /**< c
                             (const lit_utf8_size_t *) str_lengths_p);
 } /* jerry_register_magic_strings */
 
+#ifndef CONFIG_MICRO_PROFILE
 /**
  * Run garbage collection
  */
@@ -576,6 +577,8 @@ jerry_run_all_enqueued_jobs (void)
 #endif /* CONFIG_DISABLE_ES2015_PROMISE_BUILTIN */
 } /* jerry_run_all_enqueued_jobs */
 
+#endif /* CONFIG_MICRO_PROFILE */
+
 /**
  * Get global object
  *
@@ -726,6 +729,7 @@ jerry_value_is_object (const jerry_value_t value) /**< api value */
   return ecma_is_value_object (value);
 } /* jerry_value_is_object */
 
+#ifndef CONFIG_MICRO_PROFILE
 /**
  * Check if the specified value is promise.
  *
@@ -744,6 +748,7 @@ jerry_value_is_promise (const jerry_value_t value) /**< api value */
   return false;
 #endif /* !CONFIG_DISABLE_ES2015_PROMISE_BUILTIN */
 } /* jerry_value_is_promise */
+#endif /* !CONFIG_MICRO_PROFILE */
 
 /**
  * Check if the specified value is string.
@@ -773,6 +778,7 @@ jerry_value_is_undefined (const jerry_value_t value) /**< api value */
   return ecma_is_value_undefined (value);
 } /* jerry_value_is_undefined */
 
+#ifndef CONFIG_MICRO_PROFILE
 /**
  * Perform the base type of the JavaScript value.
  *
@@ -892,6 +898,7 @@ jerry_is_feature_enabled (const jerry_feature_t feature) /**< feature to check *
           );
 } /* jerry_is_feature_enabled */
 
+#endif /* !CONFIG_MICRO_PROFILE */
 /**
  * Create abort from an api value.
  *
@@ -1396,6 +1403,7 @@ jerry_create_object (void)
   return ecma_make_object_value (ecma_op_create_object_object_noarg ());
 } /* jerry_create_object */
 
+#ifndef CONFIG_MICRO_PROFILE
 /**
  * Create an empty Promise object which can be resolve/reject later
  * by calling jerry_resolve_or_reject_promise.
@@ -1416,7 +1424,9 @@ jerry_create_promise (void)
   return jerry_throw (ecma_raise_type_error (ECMA_ERR_MSG ("Promise not supported.")));
 #endif /* CONFIG_DISABLE_ES2015_PROMISE_BUILTIN */
 } /* jerry_create_promise */
+#endif /* !CONFIG_MICRO_PROFILE */
 
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
 /**
  * Create string from a valid UTF-8 string
  *
@@ -1465,6 +1475,7 @@ jerry_create_string (const jerry_char_t *str_p) /**< pointer to string */
   return jerry_create_string_sz (str_p, lit_zt_utf8_string_size ((lit_utf8_byte_t *) str_p));
 } /* jerry_create_string */
 
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 /**
  * Create string from a valid CESU-8 string
  *
@@ -1532,6 +1543,7 @@ jerry_get_string_size (const jerry_value_t value) /**< input string */
   return ecma_string_get_size (ecma_get_string_from_value (value));
 } /* jerry_get_string_size */
 
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
 /**
  * Get UTF-8 encoded string size from Jerry string
  *
@@ -1552,6 +1564,7 @@ jerry_get_utf8_string_size (const jerry_value_t value) /**< input string */
 
   return ecma_string_get_utf8_size (ecma_get_string_from_value (value));
 } /* jerry_get_utf8_string_size */
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 
 /**
  * Get length of Jerry string
@@ -1574,6 +1587,7 @@ jerry_get_string_length (const jerry_value_t value) /**< input string */
   return ecma_string_get_length (ecma_get_string_from_value (value));
 } /* jerry_get_string_length */
 
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
 /**
  * Get UTF-8 string length from Jerry string
  *
@@ -1594,6 +1608,7 @@ jerry_get_utf8_string_length (const jerry_value_t value) /**< input string */
 
   return ecma_string_get_utf8_length (ecma_get_string_from_value (value));
 } /* jerry_get_utf8_string_length */
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 
 /**
  * Copy the characters of a string into a specified buffer.
@@ -1634,6 +1649,7 @@ jerry_string_to_char_buffer (const jerry_value_t value, /**< input string value 
                                            buffer_size);
 } /* jerry_string_to_char_buffer */
 
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
 /**
  * Copy the characters of an utf-8 encoded string into a specified buffer.
  *
@@ -1672,6 +1688,7 @@ jerry_string_to_utf8_char_buffer (const jerry_value_t value, /**< input string v
                                           (lit_utf8_byte_t *) buffer_p,
                                           buffer_size);
 } /* jerry_string_to_utf8_char_buffer */
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 
 /**
  * Copy the characters of an cesu-8 encoded substring into a specified buffer.
@@ -1707,6 +1724,7 @@ jerry_substring_to_char_buffer (const jerry_value_t value, /**< input string val
                                               buffer_size);
 } /* jerry_substring_to_char_buffer */
 
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
 /**
  * Copy the characters of an utf-8 encoded substring into a specified buffer.
  *
@@ -1740,6 +1758,7 @@ jerry_substring_to_utf8_char_buffer (const jerry_value_t value, /**< input strin
                                              (lit_utf8_byte_t *) buffer_p,
                                              buffer_size);
 } /* jerry_substring_to_utf8_char_buffer */
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 
 /**
  * Checks whether the object or it's prototype objects have the given property.
@@ -2555,6 +2574,7 @@ jerry_foreach_object_property (const jerry_value_t obj_val, /**< object value */
   return false;
 } /* jerry_foreach_object_property */
 
+#ifndef CONFIG_MICRO_PROFILE
 /**
  * Resolve or reject the promise with an argument.
  *
@@ -2595,7 +2615,9 @@ jerry_resolve_or_reject_promise (jerry_value_t promise, /**< the promise value *
   return jerry_throw (ecma_raise_type_error (ECMA_ERR_MSG ("Promise not supported.")));
 #endif /* !CONFIG_DISABLE_ES2015_PROMISE_BUILTIN */
 } /* jerry_resolve_or_reject_promise */
+#endif /* !CONFIG_MICRO_PROFILE */
 
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
 /**
  * Validate UTF-8 string
  *
@@ -2623,6 +2645,7 @@ jerry_is_valid_cesu8_string (const jerry_char_t *cesu8_buf_p, /**< CESU-8 string
   return lit_is_valid_cesu8_string ((lit_utf8_byte_t *) cesu8_buf_p,
                                     (lit_utf8_size_t) buf_size);
 } /* jerry_is_valid_cesu8_string */
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 
 /**
  * Allocate memory on the engine's heap.
@@ -2720,6 +2743,7 @@ jerry_create_context (uint32_t heap_size, /**< the size of heap */
 #endif /* JERRY_ENABLE_EXTERNAL_CONTEXT */
 } /* jerry_create_context */
 
+#ifndef CONFIG_MICRO_PROFILE
 /**
  * If JERRY_VM_EXEC_STOP is defined the callback passed to this function is
  * periodically called with the user_p argument. If frequency is greater
@@ -3371,6 +3395,7 @@ jerry_json_stringfy (const jerry_value_t object_to_stringify) /**< a jerry_objec
 #endif /* !CONFIG_DISABLE_JSON_BUILTIN */
 } /* jerry_json_stringfy */
 
+#endif /* !CONFIG_MICRO_PROFILE */
 /**
  * @}
  */

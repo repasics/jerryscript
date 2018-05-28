@@ -36,6 +36,7 @@
  *   SOFTWARE.
  */
 
+
 #include <math.h>
 
 #include "ecma-helpers.h"
@@ -53,6 +54,7 @@
  * available at http://cseweb.ucsd.edu/~mandrysc/pub/dtoa.pdf
  */
 
+#ifndef CONFIG_REDUCE_FLOAT_STRINGIFY
 /**
  * Floating point format definitions (next float value)
  */
@@ -234,6 +236,8 @@ ecma_errol0_dtoa (double val, /**< ecma number */
 
   return (lit_utf8_size_t) (dst_p - buffer_p);
 } /* ecma_errol0_dtoa */
+
+#endif /* !CONFIG_REDUCE_FLOAT_STRINGIFY */
 
 /**
  * @}

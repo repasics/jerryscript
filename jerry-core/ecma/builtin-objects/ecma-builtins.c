@@ -897,6 +897,7 @@ ecma_builtin_list_lazy_property_names (ecma_object_t *object_p, /**< a built-in 
   }
 } /* ecma_builtin_list_lazy_property_names */
 
+#ifndef CONFIG_MICRO_PROFILE
 /**
  * Dispatcher of built-in routines
  *
@@ -918,6 +919,7 @@ ecma_builtin_dispatch_routine (ecma_builtin_id_t builtin_object_id, /**< built-i
                                                    arguments_list_p,
                                                    arguments_list_len);
 } /* ecma_builtin_dispatch_routine */
+#endif /* !CONFIG_MICRO_PROFILE */
 
 /**
  * Handle calling [[Call]] of built-in object
@@ -930,6 +932,10 @@ ecma_builtin_dispatch_call (ecma_object_t *obj_p, /**< built-in object */
                             const ecma_value_t *arguments_list_p, /**< arguments list */
                             ecma_length_t arguments_list_len) /**< arguments list length */
 {
+#ifdef CONFIG_MICRO_PROFILE
+  JERRY_UNUSED_4 (obj_p, this_arg_value, arguments_list_p, arguments_list_len);
+  return ECMA_VALUE_UNDEFINED;
+#else
   JERRY_ASSERT (ecma_get_object_type (obj_p) == ECMA_OBJECT_TYPE_FUNCTION);
   JERRY_ASSERT (ecma_get_object_is_builtin (obj_p));
 
@@ -954,6 +960,7 @@ ecma_builtin_dispatch_call (ecma_object_t *obj_p, /**< built-in object */
   JERRY_ASSERT (!ecma_is_value_empty (ret_value));
 
   return ret_value;
+#endif /* !CONFIG_MICRO_PROFILE */
 } /* ecma_builtin_dispatch_call */
 
 /**

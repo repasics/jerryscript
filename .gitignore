@@ -39,3 +39,7 @@ docs/doxygen
 # Tests
 tests/test262/
 .vs
+
+# micro profile
+micro_profile/micro.snapshot
+micro_profile/include/micro-source.h

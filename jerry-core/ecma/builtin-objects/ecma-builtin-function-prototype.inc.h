@@ -35,11 +35,12 @@ NUMBER_VALUE (LIT_MAGIC_STRING_LENGTH,
               0,
               ECMA_PROPERTY_FIXED)
 
+#ifndef CONFIG_MICRO_PROFILE
 /* Routine properties:
  *  (property name, C routine name, arguments number or NON_FIXED, value of the routine's length property) */
 ROUTINE (LIT_MAGIC_STRING_TO_STRING_UL, ecma_builtin_function_prototype_object_to_string, 0, 0)
 ROUTINE (LIT_MAGIC_STRING_APPLY, ecma_builtin_function_prototype_object_apply, 2, 2)
 ROUTINE (LIT_MAGIC_STRING_CALL, ecma_builtin_function_prototype_object_call, NON_FIXED, 1)
 ROUTINE (LIT_MAGIC_STRING_BIND, ecma_builtin_function_prototype_object_bind, NON_FIXED, 1)
-
+#endif /* !CONFIG_MICRO_PROFILE */
 #include "ecma-builtin-helpers-macro-undefs.inc.h"

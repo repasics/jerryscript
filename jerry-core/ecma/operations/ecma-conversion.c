@@ -310,7 +310,7 @@ ecma_get_number (ecma_value_t value, /**< ecma value*/
 {
   if (ecma_is_value_integer_number (value))
   {
-    *number_p = ecma_get_integer_from_value (value);
+    *number_p = (ecma_number_t) ecma_get_integer_from_value (value);
     return ECMA_VALUE_EMPTY;
   }
 

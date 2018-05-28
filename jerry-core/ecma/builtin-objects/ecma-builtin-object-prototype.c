@@ -44,6 +44,8 @@
  * @{
  */
 
+#ifndef CONFIG_MICRO_PROFILE
+
 /**
  * The Object.prototype object's 'toString' routine
  *
@@ -254,6 +256,7 @@ ecma_builtin_object_prototype_object_property_is_enumerable (ecma_value_t this_a
   return return_value;
 } /* ecma_builtin_object_prototype_object_property_is_enumerable */
 
+#endif /* !CONFIG_MICRO_PROFILE */
 /**
  * @}
  * @}

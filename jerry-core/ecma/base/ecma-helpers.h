@@ -367,11 +367,13 @@ ecma_number_t ecma_utf8_string_to_number (const lit_utf8_byte_t *str_p, lit_utf8
 lit_utf8_size_t ecma_uint32_to_utf8_string (uint32_t value, lit_utf8_byte_t *out_buffer_p, lit_utf8_size_t buffer_size);
 uint32_t ecma_number_to_uint32 (ecma_number_t num);
 int32_t ecma_number_to_int32 (ecma_number_t num);
+
 lit_utf8_size_t ecma_number_to_utf8_string (ecma_number_t num, lit_utf8_byte_t *buffer_p, lit_utf8_size_t buffer_size);
 
+#ifndef CONFIG_REDUCE_FLOAT_STRINGIFY
 /* ecma-helpers-errol.c */
 lit_utf8_size_t ecma_errol0_dtoa (double val, lit_utf8_byte_t *buffer_p, int32_t *exp_p);
-
+#endif /* !CONFIG_REDUCE_FLOAT_STRINGIFY */
 /**
  * @}
  * @}

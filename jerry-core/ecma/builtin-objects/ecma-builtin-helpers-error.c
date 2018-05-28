@@ -43,7 +43,9 @@ ecma_builtin_helper_error_dispatch_call (ecma_standard_error_t error_type, /**< 
                                          ecma_length_t arguments_list_len) /**< number of arguments */
 {
   JERRY_ASSERT (arguments_list_len == 0 || arguments_list_p != NULL);
-
+#ifdef CONFIG_MICRO_PROFILE
+  return ecma_make_object_value (ecma_new_standard_error (error_type));
+#else
   if (arguments_list_len != 0
       && !ecma_is_value_undefined (arguments_list_p[0]))
   {
@@ -68,10 +70,10 @@ ecma_builtin_helper_error_dispatch_call (ecma_standard_error_t error_type, /**< 
 
     return ecma_make_object_value (new_error_object_p);
   }
+#endif /* CONFIG_MICRO_PROFILE */
 } /* ecma_builtin_helper_error_dispatch_call */
 
 /**
  * @}
  * @}
  */
-

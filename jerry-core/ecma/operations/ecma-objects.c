@@ -1021,6 +1021,10 @@ ecma_op_object_delete (ecma_object_t *obj_p, /**< the object */
                        ecma_string_t *property_name_p, /**< property name */
                        bool is_throw) /**< flag that controls failure handling */
 {
+#ifdef CONFIG_MICRO_PROFILE
+  JERRY_UNUSED_3 (obj_p, property_name_p, is_throw);
+  return ECMA_VALUE_UNDEFINED;
+#else
   JERRY_ASSERT (obj_p != NULL
                 && !ecma_is_lexical_environment (obj_p));
   JERRY_ASSERT (property_name_p != NULL);
@@ -1042,6 +1046,7 @@ ecma_op_object_delete (ecma_object_t *obj_p, /**< the object */
   return ecma_op_general_object_delete (obj_p,
                                         property_name_p,
                                         is_throw);
+#endif /* CONFIG_MICRO_PROFILE */
 } /* ecma_op_object_delete */
 
 /**

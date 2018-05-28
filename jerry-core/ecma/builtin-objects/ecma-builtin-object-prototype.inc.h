@@ -27,6 +27,7 @@ OBJECT_VALUE (LIT_MAGIC_STRING_CONSTRUCTOR,
               ECMA_BUILTIN_ID_OBJECT,
               ECMA_PROPERTY_CONFIGURABLE_WRITABLE)
 
+#ifndef CONFIG_MICRO_PROFILE
 /* Routine properties:
  *  (property name, C routine name, arguments number or NON_FIXED, value of the routine's length property) */
 ROUTINE (LIT_MAGIC_STRING_TO_STRING_UL, ecma_builtin_object_prototype_object_to_string, 0, 0)
@@ -35,5 +36,6 @@ ROUTINE (LIT_MAGIC_STRING_TO_LOCALE_STRING_UL, ecma_builtin_object_prototype_obj
 ROUTINE (LIT_MAGIC_STRING_HAS_OWN_PROPERTY_UL, ecma_builtin_object_prototype_object_has_own_property, 1, 1)
 ROUTINE (LIT_MAGIC_STRING_IS_PROTOTYPE_OF_UL, ecma_builtin_object_prototype_object_is_prototype_of, 1, 1)
 ROUTINE (LIT_MAGIC_STRING_PROPERTY_IS_ENUMERABLE_UL, ecma_builtin_object_prototype_object_property_is_enumerable, 1, 1)
+#endif /* !CONFIG_MICRO_PROFILE */
 
 #include "ecma-builtin-helpers-macro-undefs.inc.h"

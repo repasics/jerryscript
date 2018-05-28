@@ -133,7 +133,8 @@ def extract_magic_string_refs(debug=False):
                 guards = guard_stack[-1]
                 guards[-1] = '!(%s)' % guards[-1]
             elif endif_match is not None:
-                guard_stack.pop()
+                if guard_stack:
+                    guard_stack.pop()
 
             lnum = fileinput.filelineno()
             process_line(fname, lnum, line, guard_stack)

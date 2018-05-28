@@ -35,6 +35,7 @@ OBJECT_VALUE (LIT_MAGIC_STRING_PROTOTYPE,
               ECMA_BUILTIN_ID_OBJECT_PROTOTYPE,
               ECMA_PROPERTY_FIXED)
 
+#ifndef CONFIG_MICRO_PROFILE
 /* Routine properties:
  *  (property name, C routine name, arguments number or NON_FIXED, value of the routine's length property) */
 ROUTINE (LIT_MAGIC_STRING_GET_PROTOTYPE_OF_UL, ecma_builtin_object_object_get_prototype_of, 1, 1)
@@ -50,6 +51,7 @@ ROUTINE (LIT_MAGIC_STRING_GET_OWN_PROPERTY_DESCRIPTOR_UL, ecma_builtin_object_ob
 ROUTINE (LIT_MAGIC_STRING_CREATE, ecma_builtin_object_object_create, 2, 2)
 ROUTINE (LIT_MAGIC_STRING_DEFINE_PROPERTIES_UL, ecma_builtin_object_object_define_properties, 2, 2)
 ROUTINE (LIT_MAGIC_STRING_DEFINE_PROPERTY_UL, ecma_builtin_object_object_define_property, 3, 3)
+#endif /* !CONFIG_MICRO_PROFILE */
 
 #ifndef CONFIG_DISABLE_ES2015_BUILTIN
 ROUTINE (LIT_MAGIC_STRING_SET_PROTOTYPE_OF_UL, ecma_builtin_object_object_set_prototype_of, 2, 2)

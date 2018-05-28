@@ -235,6 +235,8 @@ vm_run_global (const ecma_compiled_code_t *bytecode_p) /**< pointer to bytecode 
   return ret_value;
 } /* vm_run_global */
 
+#ifndef CONFIG_MICRO_PROFILE
+
 /**
  * Run specified eval-mode bytecode
  *
@@ -290,6 +292,7 @@ vm_run_eval (ecma_compiled_code_t *bytecode_data_p, /**< byte-code data */
 
   return completion_value;
 } /* vm_run_eval */
+#endif /* !CONFIG_MICRO_PROFILE */
 
 /**
  * Construct object
@@ -2158,6 +2161,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
         }
         case VM_OC_ADD:
         {
+#ifndef CONFIG_MICRO_PROFILE
           if (ecma_are_values_integer_numbers (left_value, right_value))
           {
             ecma_integer_value_t left_integer = ecma_get_integer_from_value (left_value);
@@ -2187,7 +2191,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
             right_value = ECMA_VALUE_UNDEFINED;
             break;
           }
-
+#endif /* !CONFIG_MICRO_PROFILE */
           result = opfunc_addition (left_value, right_value);
 
           if (ECMA_IS_VALUE_ERROR (result))
@@ -2204,7 +2208,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
 
           JERRY_ASSERT (!ECMA_IS_VALUE_ERROR (left_value)
                         && !ECMA_IS_VALUE_ERROR (right_value));
-
+#ifndef CONFIG_MICRO_PROFILE
           if (ecma_are_values_integer_numbers (left_value, right_value))
           {
             ecma_integer_value_t left_integer = ecma_get_integer_from_value (left_value);
@@ -2234,7 +2238,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
             right_value = ECMA_VALUE_UNDEFINED;
             break;
           }
-
+#endif /* !CONFIG_MICRO_PROFILE */
           result = do_number_arithmetic (NUMBER_ARITHMETIC_SUBSTRACTION,
                                          left_value,
                                          right_value);
@@ -2253,7 +2257,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
           JERRY_STATIC_ASSERT (ECMA_INTEGER_MULTIPLY_MAX * ECMA_INTEGER_MULTIPLY_MAX <= ECMA_INTEGER_NUMBER_MAX
                                && -(ECMA_INTEGER_MULTIPLY_MAX * ECMA_INTEGER_MULTIPLY_MAX) >= ECMA_INTEGER_NUMBER_MIN,
                                square_of_integer_multiply_max_must_fit_into_integer_value_range);
-
+#ifndef CONFIG_MICRO_PROFILE
           if (ecma_are_values_integer_numbers (left_value, right_value))
           {
             ecma_integer_value_t left_integer = ecma_get_integer_from_value (left_value);
@@ -2296,7 +2300,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
             right_value = ECMA_VALUE_UNDEFINED;
             break;
           }
-
+#endif /* !CONFIG_MICRO_PROFILE */
           result = do_number_arithmetic (NUMBER_ARITHMETIC_MULTIPLICATION,
                                          left_value,
                                          right_value);
@@ -2326,7 +2330,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
         {
           JERRY_ASSERT (!ECMA_IS_VALUE_ERROR (left_value)
                         && !ECMA_IS_VALUE_ERROR (right_value));
-
+#ifndef CONFIG_MICRO_PROFILE
           if (ecma_are_values_integer_numbers (left_value, right_value))
           {
             ecma_integer_value_t left_integer = ecma_get_integer_from_value (left_value);
@@ -2343,7 +2347,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
               }
             }
           }
-
+#endif /* !CONFIG_MICRO_PROFILE */
           result = do_number_arithmetic (NUMBER_ARITHMETIC_REMAINDER,
                                          left_value,
                                          right_value);
@@ -2401,12 +2405,13 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
           JERRY_STATIC_ASSERT (ECMA_DIRECT_TYPE_MASK == ((1 << ECMA_DIRECT_SHIFT) - 1),
                                direct_type_mask_must_fill_all_bits_before_the_value_starts);
 
+#ifndef CONFIG_MICRO_PROFILE
           if (ecma_are_values_integer_numbers (left_value, right_value))
           {
             result = left_value | right_value;
             break;
           }
-
+#endif /* !CONFIG_MICRO_PROFILE */
           result = do_number_bitwise_logic (NUMBER_BITWISE_LOGIC_OR,
                                             left_value,
                                             right_value);
@@ -2422,12 +2427,13 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
           JERRY_STATIC_ASSERT (ECMA_DIRECT_TYPE_MASK == ((1 << ECMA_DIRECT_SHIFT) - 1),
                                direct_type_mask_must_fill_all_bits_before_the_value_starts);
 
+#ifndef CONFIG_MICRO_PROFILE
           if (ecma_are_values_integer_numbers (left_value, right_value))
           {
             result = (left_value ^ right_value) & (ecma_value_t) (~ECMA_DIRECT_TYPE_MASK);
             break;
           }
-
+#endif /* !CONFIG_MICRO_PROFILE */
           result = do_number_bitwise_logic (NUMBER_BITWISE_LOGIC_XOR,
                                             left_value,
                                             right_value);
@@ -2443,12 +2449,13 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
           JERRY_STATIC_ASSERT (ECMA_DIRECT_TYPE_MASK == ((1 << ECMA_DIRECT_SHIFT) - 1),
                                direct_type_mask_must_fill_all_bits_before_the_value_starts);
 
+#ifndef CONFIG_MICRO_PROFILE
           if (ecma_are_values_integer_numbers (left_value, right_value))
           {
             result = left_value & right_value;
             break;
           }
-
+#endif /* !CONFIG_MICRO_PROFILE */
           result = do_number_bitwise_logic (NUMBER_BITWISE_LOGIC_AND,
                                             left_value,
                                             right_value);
@@ -2464,6 +2471,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
           JERRY_STATIC_ASSERT (ECMA_DIRECT_TYPE_MASK == ((1 << ECMA_DIRECT_SHIFT) - 1),
                                direct_type_mask_must_fill_all_bits_before_the_value_starts);
 
+#ifndef CONFIG_MICRO_PROFILE
           if (ecma_are_values_integer_numbers (left_value, right_value))
           {
             ecma_integer_value_t left_integer = ecma_get_integer_from_value (left_value);
@@ -2471,7 +2479,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
             result = ecma_make_int32_value ((int32_t) (left_integer << (right_integer & 0x1f)));
             break;
           }
-
+#endif /* !CONFIG_MICRO_PROFILE */
           result = do_number_bitwise_logic (NUMBER_BITWISE_SHIFT_LEFT,
                                             left_value,
                                             right_value);
@@ -2486,7 +2494,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
         {
           JERRY_STATIC_ASSERT (ECMA_DIRECT_TYPE_MASK == ((1 << ECMA_DIRECT_SHIFT) - 1),
                                direct_type_mask_must_fill_all_bits_before_the_value_starts);
-
+#ifndef CONFIG_MICRO_PROFILE
           if (ecma_are_values_integer_numbers (left_value, right_value))
           {
             ecma_integer_value_t left_integer = ecma_get_integer_from_value (left_value);
@@ -2494,7 +2502,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
             result = ecma_make_integer_value (left_integer >> (right_integer & 0x1f));
             break;
           }
-
+#endif /* !CONFIG_MICRO_PROFILE */
           result = do_number_bitwise_logic (NUMBER_BITWISE_SHIFT_RIGHT,
                                             left_value,
                                             right_value);
@@ -2510,6 +2518,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
           JERRY_STATIC_ASSERT (ECMA_DIRECT_TYPE_MASK == ((1 << ECMA_DIRECT_SHIFT) - 1),
                                direct_type_mask_must_fill_all_bits_before_the_value_starts);
 
+#ifndef CONFIG_MICRO_PROFILE
           if (ecma_are_values_integer_numbers (left_value, right_value))
           {
             uint32_t left_uint32 = (uint32_t) ecma_get_integer_from_value (left_value);
@@ -2517,7 +2526,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
             result = ecma_make_uint32_value (left_uint32 >> (right_integer & 0x1f));
             break;
           }
-
+#endif /* !CONFIG_MICRO_PROFILE */
           result = do_number_bitwise_logic (NUMBER_BITWISE_SHIFT_URIGHT,
                                             left_value,
                                             right_value);
@@ -2530,6 +2539,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
         }
         case VM_OC_LESS:
         {
+#ifndef CONFIG_MICRO_PROFILE
           if (ecma_are_values_integer_numbers (left_value, right_value))
           {
             bool is_less = (ecma_integer_value_t) left_value < (ecma_integer_value_t) right_value;
@@ -2572,6 +2582,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
             continue;
           }
 
+
           if (ecma_is_value_number (left_value) && ecma_is_value_number (right_value))
           {
             ecma_number_t left_number = ecma_get_number_from_value (left_value);
@@ -2580,7 +2591,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
             *stack_top_p++ = ecma_make_boolean_value (left_number < right_number);
             goto free_both_values;
           }
-
+#endif /* !CONFIG_MICRO_PROFILE */
           result = opfunc_relation (left_value, right_value, true, false);
 
           if (ECMA_IS_VALUE_ERROR (result))
@@ -2593,6 +2604,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
         }
         case VM_OC_GREATER:
         {
+#ifndef CONFIG_MICRO_PROFILE
           if (ecma_are_values_integer_numbers (left_value, right_value))
           {
             ecma_integer_value_t left_integer = (ecma_integer_value_t) left_value;
@@ -2610,7 +2622,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
             *stack_top_p++ = ecma_make_boolean_value (left_number > right_number);
             goto free_both_values;
           }
-
+#endif /* !CONFIG_MICRO_PROFILE */
           result = opfunc_relation (left_value, right_value, false, false);
 
           if (ECMA_IS_VALUE_ERROR (result))
@@ -2623,6 +2635,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
         }
         case VM_OC_LESS_EQUAL:
         {
+#ifndef CONFIG_MICRO_PROFILE
           if (ecma_are_values_integer_numbers (left_value, right_value))
           {
             ecma_integer_value_t left_integer = (ecma_integer_value_t) left_value;
@@ -2640,7 +2653,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
             *stack_top_p++ = ecma_make_boolean_value (left_number <= right_number);
             goto free_both_values;
           }
-
+#endif /* !CONFIG_MICRO_PROFILE */
           result = opfunc_relation (left_value, right_value, false, true);
 
           if (ECMA_IS_VALUE_ERROR (result))
@@ -2653,6 +2666,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
         }
         case VM_OC_GREATER_EQUAL:
         {
+#ifndef CONFIG_MICRO_PROFILE
           if (ecma_are_values_integer_numbers (left_value, right_value))
           {
             ecma_integer_value_t left_integer = (ecma_integer_value_t) left_value;
@@ -2670,7 +2684,7 @@ vm_loop (vm_frame_ctx_t *frame_ctx_p) /**< frame context */
             *stack_top_p++ = ecma_make_boolean_value (left_number >= right_number);
             goto free_both_values;
           }
-
+#endif /* !CONFIG_MICRO_PROFILE */
           result = opfunc_relation (left_value, right_value, true, true);
 
           if (ECMA_IS_VALUE_ERROR (result))

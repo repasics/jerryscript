@@ -48,6 +48,7 @@
  */
 #define ECMA_FUNCTION_APPLY_ARGUMENT_COUNT_LIMIT 65535
 
+#ifndef CONFIG_MICRO_PROFILE
 /**
  * The Function.prototype object's 'toString' routine
  *
@@ -318,6 +319,7 @@ ecma_builtin_function_prototype_object_bind (ecma_value_t this_arg, /**< this ar
   return ret_value;
 } /* ecma_builtin_function_prototype_object_bind */
 
+#endif /* !CONFIG_MICRO_PROFILE */
 /**
  * Handle calling [[Call]] of built-in Function.prototype object
  *

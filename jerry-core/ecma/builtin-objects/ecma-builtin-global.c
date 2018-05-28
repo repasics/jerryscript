@@ -47,6 +47,7 @@
  * @{
  */
 
+#ifndef CONFIG_MICRO_PROFILE
 /**
  * The Global object's 'eval' routine
  *
@@ -87,6 +88,8 @@ ecma_builtin_global_object_eval (ecma_value_t this_arg, /**< this argument */
   return ret_value;
 } /* ecma_builtin_global_object_eval */
 
+#endif /* !CONFIG_MICRO_PROFILE */
+#ifndef CONFIG_MICRO_PROFILE
 /**
  * The Global object's 'parseInt' routine
  *
@@ -1081,6 +1084,8 @@ ecma_builtin_global_object_encode_uri_component (ecma_value_t this_arg, /**< thi
   JERRY_UNUSED (this_arg);
   return ecma_builtin_global_object_encode_uri_helper (uri_component, unescaped_uri_component_set);
 } /* ecma_builtin_global_object_encode_uri_component */
+
+#endif /* !CONFIG_MICRO_PROFILE */
 
 #ifndef CONFIG_DISABLE_ANNEXB_BUILTIN
 

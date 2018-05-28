@@ -311,7 +311,11 @@ ecma_builtin_number_prototype_object_to_string (ecma_value_t this_arg, /**< this
         ecma_number_t counter = this_arg_number;
         while (counter >= radix)
         {
+#ifdef CONFIG_REDUCE_FLOAT_STRINGIFY
+          counter /= (ecma_number_t) radix;
+#else /* !CONFIG_REDUCE_FLOAT_STRINGIFY */
           counter /= radix;
+#endif /* CONFIG_REDUCE_FLOAT_STRINGIFY */
           magnitude++;
         }
 

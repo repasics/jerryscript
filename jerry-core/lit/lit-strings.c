@@ -31,6 +31,7 @@ bool
 lit_is_valid_utf8_string (const lit_utf8_byte_t *utf8_buf_p, /**< utf-8 string */
                           lit_utf8_size_t buf_size) /**< string size */
 {
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   lit_utf8_size_t idx = 0;
 
   bool is_prev_code_point_high_surrogate = false;
@@ -116,6 +117,11 @@ lit_is_valid_utf8_string (const lit_utf8_byte_t *utf8_buf_p, /**< utf-8 string *
   }
 
   return true;
+#else /* CONFIG_DISABLE_UTF8_CHARACTERS */
+  JERRY_UNUSED (utf8_buf_p);
+  JERRY_UNUSED (buf_size);
+  return true;
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_is_valid_utf8_string */
 
 /**
@@ -128,6 +134,7 @@ bool
 lit_is_valid_cesu8_string (const lit_utf8_byte_t *cesu8_buf_p, /**< cesu-8 string */
                            lit_utf8_size_t buf_size) /**< string size */
 {
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   lit_utf8_size_t idx = 0;
 
   while (idx < buf_size)
@@ -184,8 +191,12 @@ lit_is_valid_cesu8_string (const lit_utf8_byte_t *cesu8_buf_p, /**< cesu-8 strin
 
     idx += extra_bytes_count;
   }
-
   return true;
+#else /* CONFIG_DISABLE_UTF8_CHARACTERS */
+  JERRY_UNUSED (cesu8_buf_p);
+  JERRY_UNUSED (buf_size);
+  return true;
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_is_valid_cesu8_string */
 
 /**
@@ -209,6 +220,8 @@ lit_is_code_point_utf16_high_surrogate (lit_code_point_t code_point) /**< code p
 {
   return LIT_UTF16_HIGH_SURROGATE_MIN <= code_point && code_point <= LIT_UTF16_HIGH_SURROGATE_MAX;
 } /* lit_is_code_point_utf16_high_surrogate */
+
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
 
 /**
  * Represents code point (>0xFFFF) as surrogate pair and returns its lower part
@@ -243,6 +256,8 @@ convert_code_point_to_high_surrogate (lit_code_point_t code_point) /**< code poi
   return (LIT_UTF16_HIGH_SURROGATE_MARKER | code_unit_bits);
 } /* convert_code_point_to_high_surrogate */
 
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+
 /**
  * Calculate size of a zero-terminated utf-8 string
  *
@@ -266,6 +281,7 @@ ecma_length_t
 lit_utf8_string_length (const lit_utf8_byte_t *utf8_buf_p, /**< utf-8 string */
                         lit_utf8_size_t utf8_buf_size) /**< string size */
 {
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   ecma_length_t length = 0;
   lit_utf8_size_t size = 0;
 
@@ -278,6 +294,10 @@ lit_utf8_string_length (const lit_utf8_byte_t *utf8_buf_p, /**< utf-8 string */
   JERRY_ASSERT (size == utf8_buf_size);
 
   return length;
+#else
+  JERRY_UNUSED (utf8_buf_p);
+  return (ecma_length_t) utf8_buf_size;
+#endif /* CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_utf8_string_length */
 
 /**
@@ -289,6 +309,7 @@ lit_utf8_size_t
 lit_get_utf8_size_of_cesu8_string (const lit_utf8_byte_t *cesu8_buf_p, /**< cesu-8 string */
                                    lit_utf8_size_t cesu8_buf_size) /**< string size */
 {
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   lit_utf8_size_t offset = 0;
   lit_utf8_size_t utf8_buf_size = cesu8_buf_size;
   ecma_char_t prev_ch = 0;
@@ -309,6 +330,10 @@ lit_get_utf8_size_of_cesu8_string (const lit_utf8_byte_t *cesu8_buf_p, /**< cesu
   JERRY_ASSERT (offset == cesu8_buf_size);
 
   return utf8_buf_size;
+#else
+  JERRY_UNUSED (cesu8_buf_p);
+  return cesu8_buf_size;
+#endif /* CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_get_utf8_size_of_cesu8_string */
 
 /**
@@ -320,6 +345,7 @@ ecma_length_t
 lit_get_utf8_length_of_cesu8_string (const lit_utf8_byte_t *cesu8_buf_p, /**< cesu-8 string */
                                      lit_utf8_size_t cesu8_buf_size) /**< string size */
 {
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   lit_utf8_size_t offset = 0;
   ecma_length_t utf8_length = 0;
   ecma_char_t prev_ch = 0;
@@ -340,6 +366,10 @@ lit_get_utf8_length_of_cesu8_string (const lit_utf8_byte_t *cesu8_buf_p, /**< ce
   JERRY_ASSERT (offset == cesu8_buf_size);
 
   return utf8_length;
+#else
+    JERRY_UNUSED (cesu8_buf_p);
+    return cesu8_buf_size;
+  #endif /* CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_get_utf8_length_of_cesu8_string */
 
 /**
@@ -355,6 +385,7 @@ lit_read_code_point_from_utf8 (const lit_utf8_byte_t *buf_p, /**< buffer with ch
   JERRY_ASSERT (buf_p && buf_size);
 
   lit_utf8_byte_t c = buf_p[0];
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   if ((c & LIT_UTF8_1_BYTE_MASK) == LIT_UTF8_1_BYTE_MARKER)
   {
     *code_point = (lit_code_point_t) (c & LIT_UTF8_LAST_7_BITS_MASK);
@@ -390,6 +421,10 @@ lit_read_code_point_from_utf8 (const lit_utf8_byte_t *buf_p, /**< buffer with ch
 
   *code_point = ret;
   return bytes_count;
+#else
+  *code_point = (lit_code_point_t) (c & LIT_UTF8_LAST_7_BITS_MASK);
+  return 1;
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_read_code_point_from_utf8 */
 
 /**
@@ -404,6 +439,7 @@ lit_read_code_unit_from_utf8 (const lit_utf8_byte_t *buf_p, /**< buffer with cha
   JERRY_ASSERT (buf_p);
 
   lit_utf8_byte_t c = buf_p[0];
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   if ((c & LIT_UTF8_1_BYTE_MASK) == LIT_UTF8_1_BYTE_MARKER)
   {
     *code_point = (ecma_char_t) (c & LIT_UTF8_LAST_7_BITS_MASK);
@@ -433,6 +469,10 @@ lit_read_code_unit_from_utf8 (const lit_utf8_byte_t *buf_p, /**< buffer with cha
   JERRY_ASSERT (ret <= LIT_UTF16_CODE_UNIT_MAX);
   *code_point = (ecma_char_t) ret;
   return bytes_count;
+#else
+    *code_point = (ecma_char_t) (c & LIT_UTF8_LAST_7_BITS_MASK);
+    return 1;
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_read_code_unit_from_utf8 */
 
 /**
@@ -466,6 +506,7 @@ lit_utf8_read_next (const lit_utf8_byte_t **buf_p) /**< [in,out] buffer with cha
   return ch;
 } /* lit_utf8_read_next */
 
+#ifndef CONFIG_MICRO_PROFILE
 /**
  * Decodes a unicode code unit from non-empty cesu-8-encoded buffer
  *
@@ -482,6 +523,8 @@ lit_utf8_read_prev (const lit_utf8_byte_t **buf_p) /**< [in,out] buffer with cha
 
   return ch;
 } /* lit_utf8_read_prev */
+
+#endif /* !CONFIG_MICRO_PROFILE */
 
 /**
  * Decodes a unicode code unit from non-empty cesu-8-encoded buffer
@@ -523,7 +566,11 @@ lit_utf8_incr (const lit_utf8_byte_t **buf_p) /**< [in,out] buffer with characte
 {
   JERRY_ASSERT (*buf_p);
 
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   *buf_p += lit_get_unicode_char_size_by_utf8_first_byte (**buf_p);
+#else
+  *buf_p += 1;
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_utf8_incr */
 
 /**
@@ -533,6 +580,8 @@ void
 lit_utf8_decr (const lit_utf8_byte_t **buf_p) /**< [in,out] buffer with characters */
 {
   JERRY_ASSERT (*buf_p);
+
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   const lit_utf8_byte_t *current_p = *buf_p;
 
   do
@@ -542,6 +591,9 @@ lit_utf8_decr (const lit_utf8_byte_t **buf_p) /**< [in,out] buffer with characte
   while ((*(current_p) & LIT_UTF8_EXTRA_BYTE_MASK) == LIT_UTF8_EXTRA_BYTE_MARKER);
 
   *buf_p = current_p;
+#else
+  *buf_p-= 1;
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_utf8_decr */
 
 /**
@@ -621,6 +673,7 @@ lit_utf8_string_code_unit_at (const lit_utf8_byte_t *utf8_buf_p, /**< utf-8 stri
 inline lit_utf8_size_t JERRY_ATTR_ALWAYS_INLINE
 lit_get_unicode_char_size_by_utf8_first_byte (const lit_utf8_byte_t first_byte) /**< buffer with characters */
 {
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   if ((first_byte & LIT_UTF8_1_BYTE_MASK) == LIT_UTF8_1_BYTE_MARKER)
   {
     return 1;
@@ -634,6 +687,10 @@ lit_get_unicode_char_size_by_utf8_first_byte (const lit_utf8_byte_t first_byte) 
     JERRY_ASSERT ((first_byte & LIT_UTF8_3_BYTE_MASK) == LIT_UTF8_3_BYTE_MARKER);
     return 3;
   }
+#else
+  JERRY_UNUSED (first_byte);
+  return 1;
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_get_unicode_char_size_by_utf8_first_byte */
 
 /**
@@ -646,6 +703,7 @@ lit_code_unit_to_utf8 (ecma_char_t code_unit, /**< code unit */
                        lit_utf8_byte_t *buf_p) /**< buffer where to store the result and its size
                                                 *   should be at least LIT_UTF8_MAX_BYTES_IN_CODE_UNIT */
 {
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   if (code_unit <= LIT_UTF8_1_BYTE_CODE_POINT_MAX)
   {
     buf_p[0] = (lit_utf8_byte_t) code_unit;
@@ -681,6 +739,10 @@ lit_code_unit_to_utf8 (ecma_char_t code_unit, /**< code unit */
     buf_p[2] = LIT_UTF8_EXTRA_BYTE_MARKER | third_byte_bits;
     return 3;
   }
+#else
+  buf_p[0] = (lit_utf8_byte_t) code_unit;
+  return 1;
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_code_unit_to_utf8 */
 
 /**
@@ -693,6 +755,7 @@ lit_code_point_to_cesu8 (lit_code_point_t code_point, /**< code point */
                          lit_utf8_byte_t *buf) /**< buffer where to store the result,
                                                 *   its size should be at least 6 bytes */
 {
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   if (code_point <= LIT_UTF16_CODE_UNIT_MAX)
   {
     return lit_code_unit_to_utf8 ((ecma_char_t) code_point, buf);
@@ -703,6 +766,9 @@ lit_code_point_to_cesu8 (lit_code_point_t code_point, /**< code point */
     offset += lit_code_unit_to_utf8 (convert_code_point_to_low_surrogate (code_point), buf + offset);
     return offset;
   }
+#else
+  return lit_code_unit_to_utf8 ((ecma_char_t) code_point, buf);
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_code_point_to_cesu8 */
 
 /**
@@ -715,6 +781,7 @@ lit_code_point_to_utf8 (lit_code_point_t code_point, /**< code point */
                         lit_utf8_byte_t *buf) /**< buffer where to store the result,
                                               *   its size should be at least 4 bytes */
 {
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   if (code_point <= LIT_UTF8_1_BYTE_CODE_POINT_MAX)
   {
     buf[0] = (lit_utf8_byte_t) code_point;
@@ -773,6 +840,10 @@ lit_code_point_to_utf8 (lit_code_point_t code_point, /**< code point */
     buf[3] = LIT_UTF8_EXTRA_BYTE_MARKER | fourth_byte_bits;
     return 4;
   }
+#else
+  buf[0] = (lit_utf8_byte_t) code_point;
+  return 1;
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_code_point_to_utf8 */
 
 /**
@@ -788,6 +859,7 @@ lit_convert_cesu8_string_to_utf8_string (const lit_utf8_byte_t *cesu8_string, /*
                                                                         * (can be NULL if buffer_size == 0) */
                                          lit_utf8_size_t utf8_size) /**< size of utf-8 buffer */
 {
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   const lit_utf8_byte_t *cesu8_pos = cesu8_string;
   const lit_utf8_byte_t *cesu8_end_pos = cesu8_string + cesu8_size;
 
@@ -828,8 +900,14 @@ lit_convert_cesu8_string_to_utf8_string (const lit_utf8_byte_t *cesu8_string, /*
   JERRY_ASSERT (utf8_pos <= utf8_end_pos);
 
   return size;
+#else
+  JERRY_UNUSED (utf8_size);
+  memcpy (utf8_string, cesu8_string, cesu8_size);
+  return cesu8_size;
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_convert_cesu8_string_to_utf8_string */
 
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
 /**
  * Convert surrogate pair to code point
  *
@@ -852,6 +930,8 @@ lit_convert_surrogate_pair_to_code_point (ecma_char_t high_surrogate, /**< high 
   return code_point;
 } /* lit_convert_surrogate_pair_to_code_point */
 
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+
 /**
  * Relational compare of cesu-8 strings
  *
@@ -867,6 +947,7 @@ bool lit_compare_utf8_strings_relational (const lit_utf8_byte_t *string1_p, /**<
                                           const lit_utf8_byte_t *string2_p, /**< utf-8 string */
                                           lit_utf8_size_t string2_size) /**< string size */
 {
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   lit_utf8_byte_t *string1_pos = (lit_utf8_byte_t *) string1_p;
   lit_utf8_byte_t *string2_pos = (lit_utf8_byte_t *) string2_p;
   const lit_utf8_byte_t *string1_end_p = string1_p + string1_size;
@@ -889,4 +970,19 @@ bool lit_compare_utf8_strings_relational (const lit_utf8_byte_t *string1_p, /**<
   }
 
   return (string1_pos >= string1_end_p && string2_pos < string2_end_p);
+#else
+  if (string1_size < string2_size)
+  {
+    return string1_size;
+  }
+  else if (string2_size < string1_size)
+  {
+    return string2_size;
+  }
+  else
+  {
+    JERRY_ASSERT (string1_size == string2_size);
+    return memcmp (string1_p, string2_p, string1_size);
+  }
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_compare_utf8_strings_relational */

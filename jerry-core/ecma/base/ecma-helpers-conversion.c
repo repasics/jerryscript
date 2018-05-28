@@ -818,6 +818,11 @@ ecma_number_to_int32 (ecma_number_t num) /**< ecma-number */
   return ret;
 } /* ecma_number_to_int32 */
 
+#ifdef CONFIG_REDUCE_FLOAT_STRINGIFY
+static lit_utf8_size_t
+ecma_double_to_binary_floating_point (double val, lit_utf8_byte_t *buffer_p, int32_t *exp_p);
+#endif /* !CONFIG_REDUCE_FLOAT_STRINGIFY */
+
 /**
   * Perform conversion of ecma-number to decimal representation with decimal exponent.
   *
@@ -839,7 +844,11 @@ ecma_number_to_decimal (ecma_number_t num, /**< ecma-number */
   JERRY_ASSERT (!ecma_number_is_infinity (num));
   JERRY_ASSERT (!ecma_number_is_negative (num));
 
+#ifndef CONFIG_REDUCE_FLOAT_STRINGIFY
   return ecma_errol0_dtoa ((double) num, out_digits_p, out_decimal_exp_p);
+#else
+  return ecma_double_to_binary_floating_point (num, out_digits_p, out_decimal_exp_p);
+#endif /* !CONFIG_REDUCE_FLOAT_STRINGIFY */
 } /* ecma_number_to_decimal */
 
 /**
@@ -974,8 +983,13 @@ ecma_number_to_binary_floating_point_number (ecma_number_t num, /**< ecma-number
   JERRY_ASSERT (!ecma_number_is_zero (num));
   JERRY_ASSERT (!ecma_number_is_infinity (num));
   JERRY_ASSERT (!ecma_number_is_negative (num));
-
+#ifndef CONFIG_REDUCE_FLOAT_STRINGIFY
   return ecma_double_to_binary_floating_point ((double) num, out_digits_p, out_decimal_exp_p);
+#else
+  JERRY_UNUSED (out_digits_p);
+  JERRY_UNUSED (out_decimal_exp_p);
+  return 0;
+#endif /* !CONFIG_REDUCE_FLOAT_STRINGIFY */
 } /* ecma_number_to_binary_floating_point_number */
 
 /**
@@ -1050,7 +1064,6 @@ ecma_number_to_utf8_string (ecma_number_t num, /**< ecma-number */
   {
     /* 6. */
     dst_p += k;
-
     memset (dst_p, LIT_CHAR_0, (size_t) (n - k));
     dst_p += n - k;
 
@@ -1073,7 +1086,10 @@ ecma_number_to_utf8_string (ecma_number_t num, /**< ecma-number */
   {
     /* 8. */
     memmove (dst_p + 2 - n, dst_p, (size_t) k);
-    memset (dst_p + 2, LIT_CHAR_0, (size_t) -n);
+    if (n != 0)
+    {
+      memset (dst_p + 2, LIT_CHAR_0, (size_t) -n);
+    }
     *dst_p = LIT_CHAR_0;
     *(dst_p + 1) = LIT_CHAR_DOT;
     dst_p += k - n + 2;

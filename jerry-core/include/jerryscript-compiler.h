@@ -81,7 +81,9 @@ void * __cdecl _alloca (size_t _Size);
  * Function attribute to inline function to all call sites.
  */
 #ifndef JERRY_ATTR_ALWAYS_INLINE
+#ifndef CONFIG_MICRO_PROFILE
 #define JERRY_ATTR_ALWAYS_INLINE
+#endif /* !CONFIG_MICRO_PROFILE */
 #endif /* !JERRY_ATTR_ALWAYS_INLINE */
 
 /**

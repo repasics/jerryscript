@@ -134,7 +134,9 @@ lit_utf8_size_t lit_read_prev_code_unit_from_utf8 (const lit_utf8_byte_t *buf_p,
                                                    ecma_char_t *code_point);
 
 ecma_char_t lit_utf8_read_next (const lit_utf8_byte_t **buf_p);
+#ifndef CONFIG_MICRO_PROFILE
 ecma_char_t lit_utf8_read_prev (const lit_utf8_byte_t **buf_p);
+#endif /* !CONFIG_MICRO_PROFILE */
 ecma_char_t lit_utf8_peek_next (const lit_utf8_byte_t *buf_p);
 ecma_char_t lit_utf8_peek_prev (const lit_utf8_byte_t *buf_p);
 void lit_utf8_incr (const lit_utf8_byte_t **buf_p);

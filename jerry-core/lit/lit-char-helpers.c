@@ -14,13 +14,16 @@
  */
 
 #include "lit-char-helpers.h"
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
 #include "lit-unicode-ranges.inc.h"
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 #include "lit-strings.h"
 
 #ifndef CONFIG_DISABLE_UNICODE_CASE_CONVERSION
 #include "lit-unicode-conversions.inc.h"
 #endif /* !CONFIG_DISABLE_UNICODE_CASE_CONVERSION */
 
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
 #define NUM_OF_ELEMENTS(array) (sizeof (array) / sizeof ((array)[0]))
 
 /**
@@ -101,6 +104,8 @@ search_char_in_interval_array (ecma_char_t c,               /**< code unit */
   return false;
 } /* search_char_in_interval_array */
 
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+
 /**
  * Check if specified character is one of the Whitespace characters including those
  * that fall into "Space, Separator" ("Zs") Unicode character category.
@@ -120,6 +125,7 @@ lit_char_is_white_space (ecma_char_t c) /**< code unit */
   }
   else
   {
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
     return (c == LIT_CHAR_NBSP
             || c == LIT_CHAR_BOM
             || (c >= lit_unicode_separator_char_interval_sps[0]
@@ -127,6 +133,9 @@ lit_char_is_white_space (ecma_char_t c) /**< code unit */
             || search_char_in_char_array (c,
                                           lit_unicode_separator_chars,
                                           NUM_OF_ELEMENTS (lit_unicode_separator_chars)));
+#else /* CONFIG_DISABLE_UTF8_CHARACTERS */
+  return (c == LIT_CHAR_NBSP || c == LIT_CHAR_BOM);
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
   }
 } /* lit_char_is_white_space */
 
@@ -145,6 +154,7 @@ lit_char_is_line_terminator (ecma_char_t c) /**< code unit */
           || c == LIT_CHAR_PS);
 } /* lit_char_is_line_terminator */
 
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
 /**
  * Check if specified character is a unicode letter
  *
@@ -199,6 +209,8 @@ lit_char_is_unicode_non_letter_ident_part (ecma_char_t c) /**< code unit */
                                         NUM_OF_ELEMENTS (lit_unicode_non_letter_ident_part_chars)));
 } /* lit_char_is_unicode_non_letter_ident_part */
 
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
+
 /**
  * Checks whether the next UTF8 character is a valid identifier start.
  *
@@ -207,6 +219,7 @@ lit_char_is_unicode_non_letter_ident_part (ecma_char_t c) /**< code unit */
 bool
 lit_char_is_identifier_start (const uint8_t *src_p) /**< pointer to a vaild UTF8 character */
 {
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   if (*src_p <= LIT_UTF8_1_BYTE_CODE_POINT_MAX)
   {
     return lit_char_is_identifier_start_character (*src_p);
@@ -221,6 +234,9 @@ lit_char_is_identifier_start (const uint8_t *src_p) /**< pointer to a vaild UTF8
   }
 
   return lit_char_is_identifier_start_character (lit_utf8_peek_next (src_p));
+#else /* CONFIG_DISABLE_UTF8_CHARACTERS */
+  return lit_char_is_identifier_start_character (*src_p);
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_char_is_identifier_start */
 
 /**
@@ -239,8 +255,11 @@ lit_char_is_identifier_start_character (uint16_t chr) /**< EcmaScript character 
             || chr == LIT_CHAR_DOLLAR_SIGN
             || chr == LIT_CHAR_UNDERSCORE);
   }
-
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   return lit_char_is_unicode_letter (chr);
+#else /* CONFIG_DISABLE_UTF8_CHARACTERS */
+  return false;
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_char_is_identifier_start_character */
 
 /**
@@ -251,6 +270,7 @@ lit_char_is_identifier_start_character (uint16_t chr) /**< EcmaScript character 
 bool
 lit_char_is_identifier_part (const uint8_t *src_p) /**< pointer to a vaild UTF8 character */
 {
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   if (*src_p <= LIT_UTF8_1_BYTE_CODE_POINT_MAX)
   {
     return lit_char_is_identifier_part_character (*src_p);
@@ -265,6 +285,9 @@ lit_char_is_identifier_part (const uint8_t *src_p) /**< pointer to a vaild UTF8 
   }
 
   return lit_char_is_identifier_part_character (lit_utf8_peek_next (src_p));
+#else /* CONFIG_DISABLE_UTF8_CHARACTERS */
+  return lit_char_is_identifier_part_character (*src_p);
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_char_is_identifier_part */
 
 /**
@@ -284,9 +307,12 @@ lit_char_is_identifier_part_character (uint16_t chr) /**< EcmaScript character *
             || chr == LIT_CHAR_DOLLAR_SIGN
             || chr == LIT_CHAR_UNDERSCORE);
   }
-
+#ifndef CONFIG_DISABLE_UTF8_CHARACTERS
   return (lit_char_is_unicode_letter (chr)
           || lit_char_is_unicode_non_letter_ident_part (chr));
+#else /* CONFIG_DISABLE_UTF8_CHARACTERS */
+  return false;
+#endif /* !CONFIG_DISABLE_UTF8_CHARACTERS */
 } /* lit_char_is_identifier_part_character */
 
 /**

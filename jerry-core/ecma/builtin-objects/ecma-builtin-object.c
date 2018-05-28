@@ -52,6 +52,7 @@ ecma_value_t
 ecma_builtin_object_dispatch_call (const ecma_value_t *arguments_list_p, /**< arguments list */
                                    ecma_length_t arguments_list_len) /**< number of arguments */
 {
+#ifndef CONFIG_MICRO_PROFILE
   JERRY_ASSERT (arguments_list_len == 0 || arguments_list_p != NULL);
 
   ecma_value_t ret_value = ECMA_VALUE_EMPTY;
@@ -68,6 +69,10 @@ ecma_builtin_object_dispatch_call (const ecma_value_t *arguments_list_p, /**< ar
   }
 
   return ret_value;
+#else
+  JERRY_UNUSED_2 (arguments_list_p, arguments_list_len);
+  return ECMA_VALUE_ERROR;
+#endif /* !CONFIG_MICRO_PROFILE */
 } /* ecma_builtin_object_dispatch_call */
 
 /**
@@ -79,6 +84,7 @@ ecma_value_t
 ecma_builtin_object_dispatch_construct (const ecma_value_t *arguments_list_p, /**< arguments list */
                                         ecma_length_t arguments_list_len) /**< number of arguments */
 {
+#ifndef CONFIG_MICRO_PROFILE
   JERRY_ASSERT (arguments_list_len == 0 || arguments_list_p != NULL);
 
   if (arguments_list_len == 0)
@@ -91,7 +97,13 @@ ecma_builtin_object_dispatch_construct (const ecma_value_t *arguments_list_p, /*
   {
     return ecma_op_create_object_object_arg (arguments_list_p[0]);
   }
+#else
+    JERRY_UNUSED_2 (arguments_list_p, arguments_list_len);
+    return ECMA_VALUE_ERROR;
+#endif /* !CONFIG_MICRO_PROFILE */
 } /* ecma_builtin_object_dispatch_construct */
+
+#ifndef CONFIG_MICRO_PROFILE
 
 /**
  * The Object object's 'getPrototypeOf' routine
@@ -934,6 +946,8 @@ ecma_builtin_object_object_define_property (ecma_value_t this_arg, /**< 'this' a
 
   return ret_value;
 } /* ecma_builtin_object_object_define_property */
+
+#endif /* !CONFIG_MICRO_PROFILE */
 
 /**
  * @}

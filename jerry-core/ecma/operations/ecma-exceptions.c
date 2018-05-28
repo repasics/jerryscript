@@ -188,6 +188,7 @@ ecma_get_error_type (ecma_object_t *error_object) /**< possible error object */
   return ECMA_ERROR_NONE;
 } /* ecma_get_error_type */
 
+
 /**
  * Standard ecma-error object constructor.
  *
@@ -199,7 +200,8 @@ ecma_new_standard_error_with_message (ecma_standard_error_t error_type, /**< nat
                                       ecma_string_t *message_string_p) /**< message string */
 {
   ecma_object_t *new_error_obj_p = ecma_new_standard_error (error_type);
-
+  JERRY_UNUSED (message_string_p);
+#ifndef CONFIG_MICRO_PROFILE
   ecma_property_value_t *prop_value_p;
   prop_value_p = ecma_create_named_data_property (new_error_obj_p,
                                                   ecma_get_magic_string (LIT_MAGIC_STRING_MESSAGE),
@@ -208,7 +210,7 @@ ecma_new_standard_error_with_message (ecma_standard_error_t error_type, /**< nat
 
   ecma_ref_ecma_string (message_string_p);
   prop_value_p->value = ecma_make_string_value (message_string_p);
-
+#endif /* !CONFIG_MICRO_PROFILE */
   return new_error_obj_p;
 } /* ecma_new_standard_error_with_message */
 
@@ -224,6 +226,10 @@ ecma_raise_standard_error (ecma_standard_error_t error_type, /**< error type */
 {
   ecma_object_t *error_obj_p;
 
+#ifdef CONFIG_MICRO_PROFILE
+  JERRY_UNUSED (msg_p);
+  error_obj_p = ecma_new_standard_error (error_type);
+#else
   if (msg_p != NULL)
   {
     ecma_string_t *error_msg_p = ecma_new_ecma_string_from_utf8 (msg_p,
@@ -235,6 +241,7 @@ ecma_raise_standard_error (ecma_standard_error_t error_type, /**< error type */
   {
     error_obj_p = ecma_new_standard_error (error_type);
   }
+#endif /* !CONFIG_MICRO_PROFILE */
 
   JERRY_CONTEXT (error_value) = ecma_make_object_value (error_obj_p);
   JERRY_CONTEXT (status_flags) |= ECMA_STATUS_EXCEPTION;
