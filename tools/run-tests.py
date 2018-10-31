@@ -156,6 +156,8 @@ def get_arguments():
                         help='Add a comma separated list of patterns of the excluded JS-tests')
     parser.add_argument('--outdir', metavar='DIR', default=OUTPUT_DIR,
                         help='Specify output directory (default: %(default)s)')
+    parser.add_argument('--generated-test-suite', action='store_true',
+                        help='Generate and run tests')
     parser.add_argument('--check-signed-off', metavar='TYPE', nargs='?',
                         choices=['strict', 'tolerant', 'travis'], const='strict',
                         help='Run signed-off check (%(choices)s; default type if not given: %(const)s)')
@@ -281,6 +283,60 @@ def iterate_test_runner_jobs(jobs, options):
         test_cmd = [settings.TEST_RUNNER_SCRIPT, bin_path]
 
         yield job, ret_build, test_cmd
+
+def generate_and_run_tests(options):
+    COUNTER = 1000;
+    DEST = os.path.join(settings.PROJECT_DIR, 'tests', 'generated')
+    PATH = os.path.join(settings.PROJECT_DIR, 'tests', 'jerry', 'generators')
+    SEED = 532566
+
+    sys.path.append(PATH)
+
+    if not os.path.isdir(DEST):
+        os.makedirs(DEST)
+
+    for filename in os.listdir(PATH):
+        MODULE_NAME = os.path.splitext(filename)[0]
+        GENERATED_FILE_NAME = "%s.js" % MODULE_NAME [9:]
+        GENERATED_FILE = os.path.join(DEST, GENERATED_FILE_NAME)
+
+        if  not os.path.isfile(GENERATED_FILE):
+            MODULE = __import__(MODULE_NAME)
+            MODULE.generate(DEST, SEED, COUNTER)
+
+    run_generated_tests(options, DEST)
+
+
+def run_generated_tests(options, DIR):
+    ret_build = ret_test = 0
+    for job, ret_build, test_cmd in iterate_test_runner_jobs(JERRY_TESTS_OPTIONS, options):
+        if ret_build:
+            break
+
+        test_cmd.append(DIR)
+
+        if options.quiet:
+            test_cmd.append("-q")
+
+        skip_list = []
+
+        if '--profile=es2015-subset' in job.build_args:
+            skip_list.append(r"es5.1\/")
+        else:
+            skip_list.append(r"es2015\/")
+
+        if options.skip_list:
+            skip_list.append(options.skip_list)
+
+        if skip_list:
+            test_cmd.append("--skip-list=" + ",".join(skip_list))
+
+        if job.test_args:
+            test_cmd.extend(job.test_args)
+
+        ret_test |= run_check(test_cmd, env=dict(TZ='UTC'))
+
+    return ret_build | ret_test
 
 def run_check(runnable, env=None):
     report_command('Test command:', runnable, env=env)
@@ -423,6 +479,7 @@ Check = collections.namedtuple('Check', ['enabled', 'runner', 'arg'])
 
 def main(options):
     checks = [
+        Check(options.generated_test_suite, generate_and_run_tests, options),
         Check(options.check_signed_off, run_check, [settings.SIGNED_OFF_SCRIPT]
               + {'tolerant': ['--tolerant'], 'travis': ['--travis']}.get(options.check_signed_off, [])),
         Check(options.check_cppcheck, run_check, [settings.CPPCHECK_SCRIPT]),
