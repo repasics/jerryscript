@@ -285,35 +285,35 @@ def iterate_test_runner_jobs(jobs, options):
         yield job, ret_build, test_cmd
 
 def generate_and_run_tests(options):
-    COUNTER = 1000;
-    DEST = os.path.join(settings.PROJECT_DIR, 'tests', 'generated')
-    PATH = os.path.join(settings.PROJECT_DIR, 'tests', 'jerry', 'generators')
-    SEED = 532566
+    counter = 1000
+    dest = os.path.join(settings.PROJECT_DIR, 'tests', 'generated')
+    path = os.path.join(settings.PROJECT_DIR, 'tests', 'jerry', 'generators')
+    seed = 532566
 
-    sys.path.append(PATH)
+    sys.path.append(path)
 
-    if not os.path.isdir(DEST):
-        os.makedirs(DEST)
+    if not os.path.isdir(dest):
+        os.makedirs(dest)
 
-    for filename in os.listdir(PATH):
-        MODULE_NAME = os.path.splitext(filename)[0]
-        GENERATED_FILE_NAME = "%s.js" % MODULE_NAME [9:]
-        GENERATED_FILE = os.path.join(DEST, GENERATED_FILE_NAME)
+    for filename in os.listdir(path):
+        module_name = os.path.splitext(filename)[0]
+        generated_file_name = "%s.js" % module_name[9:]
+        generated_file = os.path.join(dest, generated_file_name)
 
-        if  not os.path.isfile(GENERATED_FILE):
-            MODULE = __import__(MODULE_NAME)
-            MODULE.generate(DEST, SEED, COUNTER)
+        if  not os.path.isfile(generated_file):
+            module = __import__(module_name)
+            module.generate(dest, seed, counter)
 
-    run_generated_tests(options, DEST)
+    run_generated_tests(options, dest)
 
 
-def run_generated_tests(options, DIR):
+def run_generated_tests(options, folder):
     ret_build = ret_test = 0
     for job, ret_build, test_cmd in iterate_test_runner_jobs(JERRY_TESTS_OPTIONS, options):
         if ret_build:
             break
 
-        test_cmd.append(DIR)
+        test_cmd.append(folder)
 
         if options.quiet:
             test_cmd.append("-q")
