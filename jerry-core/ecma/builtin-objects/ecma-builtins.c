@@ -54,7 +54,7 @@ typedef ecma_value_t (*ecma_builtin_dispatch_call_t)(const ecma_value_t argument
 /**
  * List of the built-in routines.
  */
-static const ecma_builtin_dispatch_routine_t ecma_builtin_routines[] =
+static const ecma_builtin_dispatch_routine_t ecma_builtin_routines[] __attribute__((unused)) =
 {
 /** @cond doxygen_suppress */
 #define BUILTIN(a, b, c, d, e)
@@ -83,7 +83,7 @@ static const ecma_builtin_dispatch_routine_t ecma_builtin_routines[] =
 /**
  * List of the built-in call functions.
  */
-static const ecma_builtin_dispatch_call_t ecma_builtin_call_functions[] =
+static const ecma_builtin_dispatch_call_t ecma_builtin_call_functions[] __attribute__((unused)) =
 {
 /** @cond doxygen_suppress */
 #define BUILTIN(a, b, c, d, e)
