@@ -1378,8 +1378,9 @@ ecma_builtin_array_prototype_object_splice (ecma_value_t this_arg, /**< this arg
       }
     }
     /* 13. */
-    else if (item_count > delete_count)
+    else
     {
+      JERRY_ASSERT (item_count > delete_count);
       /* 13.b */
       for (k = len - delete_count; k > start  && ecma_is_value_empty (ret_value); k--)
       {
