@@ -75,6 +75,15 @@ obj_2.join = Array.prototype.join;
 
 assert (obj_2.join() === "1,2,3");
 
+/* ES v5.1 15.4.4.5.1.
+   Checking behavior when the function's this_argument is undefined */
+try {
+  Array.prototype.join.call(undefined);
+  assert(false);
+} catch (e) {
+  assert(e instanceof TypeError);
+}
+
 /* ES v5.1 15.4.4.5.7.
    Checking behavior when an element throws error */
 try {
