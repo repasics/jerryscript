@@ -74,3 +74,40 @@ try {
 }
 assert(o.length === 1);
 assert(o[0] === "z");
+
+/* ES v5.1 15.4.4.7.1.
+   Checking behavior when this value is undefined */
+var obj = { push : Array.prototype.push };
+
+try {
+  obj.push.call(undefined);
+  assert(false);
+} catch (e) {
+  assert(e instanceof TypeError);
+}
+
+/* ES v5.1 15.4.4.7.2.
+   Checking behavior when unable to get length */
+var obj = { push : Array.prototype.push}
+Object.defineProperty(obj, 'length', { 'get' : function () { throw new ReferenceError ("foo"); } });
+
+try {
+  obj.push();
+  assert(false);
+} catch (e) {
+  assert(e.message === "foo");
+  assert(e instanceof ReferenceError);
+}
+
+/* ES v5.1 15.4.4.7.5.
+   Checking behavior when array is non-extensible while pushing */
+var arr = [];
+Object.freeze(arr);
+
+try {
+  arr.push(1, 2);
+  assert(false);
+}
+catch (e) {
+  assert(e instanceof TypeError);
+}
