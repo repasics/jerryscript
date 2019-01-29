@@ -135,3 +135,36 @@ try {
 
 // Checking behavior when the there are more than 2 arguments
 assert (array.find (function (e) { return e < 2 }, {}, 8, 4, 5, 6, 6) === 1);
+
+function func (element) {
+  return element > 8;
+}
+
+/* ES v6.0 22.1.3.8.2.
+   Checking behavior when the function's this_argument is null */
+try {
+  Array.prototype.find.call(null, func);
+  assert(false);
+} catch (e) {
+  assert(e instanceof TypeError);
+}
+
+/* ES v6.0 22.1.3.8.4.
+   Checking behavior when the length of the object is an object which throws error */
+try {
+  var o = {};
+  Object.defineProperty(o, 'toString', { 'get' : function() { throw new ReferenceError("foo"); } });
+  var a = { length : o };
+  Array.prototype.find.call(a, func);
+  assert(false);
+} catch (e) {
+  assert(e instanceof ReferenceError);
+  assert(e.message == "foo");
+}
+
+/* ES v6.0 22.1.3.8.8.c
+   Checking behavior when the first element deletes the second */
+var f = function () { delete arr[1]; };
+var arr = [0, 1, 2, 3];
+Object.defineProperty(arr, '0', { 'get' : f });
+Array.prototype.find.call(arr, func);

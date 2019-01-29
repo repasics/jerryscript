@@ -74,3 +74,28 @@ try {
   assert(e.message === "foo");
   assert(e instanceof ReferenceError);
 }
+
+/* ES v5.1 15.4.4.4.1.
+   Checking behavior when this value is undefined */
+try {
+  Array.prototype.concat.call(undefined);
+  assert(false);
+}
+catch (e) {
+  assert(e instanceof TypeError);
+}
+
+/* ES v5.1 15.4.4.4.5.
+   Checking behavior when unable to get element from a given array */
+arr1 = [];
+arr2 = [];
+arr3 = [];
+Object.defineProperty(arr2, '0', { 'get' : function () {throw new ReferenceError ("foo"); } });
+
+try {
+  arr1.concat(arr2, arr3);
+  assert(false);
+}
+catch (e) {
+  assert(e instanceof ReferenceError);
+}
